@@ -192,12 +192,35 @@ export interface TrafficSnapshot {
   events: TrafficEvent[]
 }
 
+export type NavigationKind = 'pickup' | 'delivery' | 'battery'
+
+export interface NavigationTarget {
+  readonly id: string
+  readonly name: string
+  readonly kind: NavigationKind
+  readonly position: Point2
+  readonly radius: number
+  readonly roadId: string
+}
+
+export interface NavigationSnapshot {
+  readonly targets: readonly NavigationTarget[]
+  readonly targetId: string | null
+  readonly route: readonly Point2[]
+  readonly distance: number
+  readonly directDistance: number
+  readonly arrived: boolean
+}
+
+export type NavigationFrameListener = (rider: Readonly<RiderSnapshot>, navigation: NavigationSnapshot) => void
+
 export interface EngineSnapshot {
   view: CityView
   cameraMode: RideCameraMode
   riderPreview: RiderPreviewMode
   rider: RiderSnapshot
   traffic: TrafficSnapshot
+  navigation: NavigationSnapshot
   fps: number
   drawCalls: number
   triangleCount: number

@@ -15,12 +15,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CITY_LAYOUT } from './cityLayout'
 import { buildWorld } from './worldBuilder'
 import { buildRiderVehicle, RIDER_WHEEL_RADIUS } from './riderVehicle'
-import { RiderController } from './riderController'
+import { RiderController, RIDER_COLLISION_RADIUS } from './riderController'
 import { FollowCamera } from './followCamera'
 import { buildBrakeDust } from './brakeDust'
 import { TrafficSystem } from './trafficSystem'
 import { buildTrafficVisuals } from './trafficVisuals'
-import type { CityView, Direction, EngineSnapshot, RideCameraMode, RiderPreviewMode } from './types'
+import { NavigationSystem } from './navigationSystem'
+import { buildNavigationVisuals } from './navigationVisuals'
+import type { CityView, Direction, EngineSnapshot, NavigationFrameListener, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
   'food-street': 'shaxian-snacks',
@@ -42,6 +44,10 @@ export class GameEngine {
   private readonly dust = buildBrakeDust()
   private readonly traffic = new TrafficSystem(CITY_LAYOUT, (event) => console.info('交通事件', event))
   private readonly trafficVisuals: ReturnType<typeof buildTrafficVisuals>
+  private readonly navigation = new NavigationSystem(CITY_LAYOUT, RIDER_COLLISION_RADIUS)
+  private readonly navigationVisuals: ReturnType<typeof buildNavigationVisuals>
+  private navigationFrameListener: NavigationFrameListener | null = null
+  private navigationElapsed = 0
   private hornRemaining = 0
   private readonly keys = new Set<string>()
   private readonly renderer: WebGLRenderer
@@ -91,7 +97,8 @@ export class GameEngine {
     this.scene.add(this.world.root)
     this.rider = buildRiderVehicle()
     this.trafficVisuals = buildTrafficVisuals(CITY_LAYOUT, this.traffic.signals, this.traffic.vehicles)
-    this.scene.add(this.rider.root, this.dust.root, this.trafficVisuals.root)
+    this.navigationVisuals = buildNavigationVisuals(this.navigation.targets)
+    this.scene.add(this.rider.root, this.dust.root, this.trafficVisuals.root, this.navigationVisuals.root)
     this.updateRider()
 
     this.controls = new OrbitControls(this.previewCamera, this.renderer.domElement)
@@ -124,6 +131,8 @@ export class GameEngine {
     this.dust.clear()
     this.updateRider()
     const riderView = view === 'rider-rear' || view === 'rider-side'
+    this.navigationVisuals.root.visible = !riderView
+    this.navigationVisuals.update(0, this.controller.state, this.navigation.snapshot, view === 'ride')
     const shadowExtent = view === 'ride' ? 40 : riderView ? 7 : 290
     this.sunlight.target.position.copy(view === 'ride' || riderView ? this.rider.root.position : this.scene.position)
     this.sunlight.position.copy(this.sunlight.target.position).add({ x: -240, y: 410, z: 220 })
@@ -178,8 +187,23 @@ export class GameEngine {
     this.focusCanvas()
   }
 
+  setNavigationTarget(id: string | null) {
+    this.navigation.selectTarget(id)
+    this.navigation.update(this.controller.state)
+    this.navigationElapsed = 0
+    this.lastSnapshotTime = 0
+    this.focusCanvas()
+  }
+
+  setNavigationFrameListener(listener: NavigationFrameListener | null) {
+    this.navigationFrameListener = listener
+    listener?.(this.controller.state, this.navigation.snapshot)
+  }
+
   resetRider() {
     this.controller.reset()
+    this.navigation.reset()
+    this.navigationElapsed = 0
     this.traffic.reset()
     this.trafficVisuals.update(0)
     this.collisionDisplayTime = 0
@@ -219,6 +243,8 @@ export class GameEngine {
     this.controls.dispose()
     this.dust.dispose()
     this.trafficVisuals.dispose()
+    this.navigationFrameListener = null
+    this.navigationVisuals.dispose()
     this.rider.dispose()
     this.world.dispose()
     this.sunlight.shadow.dispose()
@@ -309,6 +335,11 @@ export class GameEngine {
       const impact = this.traffic.checkCollision(state)
       if (impact) this.controller.applyTrafficImpact(impact.normalX, impact.normalZ, impact.distance)
       this.traffic.checkSignals(previousPosition, state)
+      this.navigationElapsed += deltaSeconds
+      if (this.navigationElapsed >= 0.1) {
+        this.navigation.update(state)
+        this.navigationElapsed %= 0.1
+      }
       this.collisionDisplayTime = state.colliding ? 0.35 : Math.max(0, this.collisionDisplayTime - deltaSeconds)
       this.updateRider()
       this.dust.update(deltaSeconds, state, state.heading, state.speed, state.braking)
@@ -326,6 +357,8 @@ export class GameEngine {
       }
       this.controls.update(deltaSeconds)
     }
+    this.navigationVisuals.update(deltaSeconds, this.controller.state, this.navigation.snapshot, this.view === 'ride')
+    this.navigationFrameListener?.(this.controller.state, this.navigation.snapshot)
     this.world.updateCanopyOcclusion(this.followCamera.camera.position, this.view === 'ride' ? this.rider.root.position : null, deltaSeconds)
     this.renderer.render(this.scene, this.view === 'ride' ? this.followCamera.camera : this.previewCamera)
     this.sampleFrames += 1
@@ -349,6 +382,7 @@ export class GameEngine {
           boosting: state.boosting, colliding: this.collisionDisplayTime > 0,
         },
         traffic: this.traffic.getSnapshot(state, this.hornRemaining > 0),
+        navigation: this.navigation.snapshot,
         fps: this.fps,
         drawCalls: this.renderer.info.render.calls,
         triangleCount: this.renderer.info.render.triangles,

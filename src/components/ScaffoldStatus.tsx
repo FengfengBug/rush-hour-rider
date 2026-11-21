@@ -1,6 +1,9 @@
 import { Bike, Sun } from 'lucide-react'
 import { CITY_LAYOUT } from '../game/cityLayout'
-import type { CityView, EngineSnapshot, RideCameraMode, RiderPreviewMode } from '../game/types'
+import { NAVIGATION_COLORS } from '../game/navigationSystem'
+import { MiniMap } from './MiniMap'
+import type { GameEngine } from '../game/gameEngine'
+import type { CityView, EngineSnapshot, NavigationKind, RideCameraMode, RiderPreviewMode } from '../game/types'
 
 const cityViews: { id: CityView; label: string }[] = [
   { id: 'rider-rear', label: '骑手后视' },
@@ -31,8 +34,14 @@ const cityPoints = [
   ...CITY_LAYOUT.batteryStations.map((station) => ({ ...station, label: '换电' })),
 ]
 
+const navigationKinds: { kind: NavigationKind; label: string }[] = [
+  { kind: 'pickup', label: '取餐' }, { kind: 'delivery', label: '送达' }, { kind: 'battery', label: '换电' },
+]
+
 interface ScaffoldStatusProps {
+  engine: GameEngine | null
   snapshot: EngineSnapshot | null
+  onNavigationTargetChange: (id: string | null) => void
   onViewChange: (view: CityView) => void
   onRiderPreviewChange: (mode: RiderPreviewMode) => void
   onCameraChange: (mode: RideCameraMode) => void
@@ -40,13 +49,15 @@ interface ScaffoldStatusProps {
 }
 
 export function ScaffoldStatus({
-  snapshot, onViewChange, onRiderPreviewChange, onCameraChange, onResetRider,
+  engine, snapshot, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onResetRider,
 }: ScaffoldStatusProps) {
   const view = snapshot?.view ?? 'ride'
   const cameraMode = snapshot?.cameraMode ?? 'near'
   const riderPreview = snapshot?.riderPreview ?? 'parked'
   const rider = snapshot?.rider
   const traffic = snapshot?.traffic
+  const navigation = snapshot?.navigation
+  const selectedTarget = navigation?.targets.find((target) => target.id === navigation.targetId)
   const nearbySignal = traffic?.nearbySignal
   const recentEvents = traffic?.events.slice(0, 3)
   const signalLabels = { red: '红灯', yellow: '黄灯', green: '绿灯' }
@@ -70,10 +81,38 @@ export function ScaffoldStatus({
             <p>RUSH HOUR RIDER</p>
           </div>
         </div>
-        <span className="task-badge">TASK 1.5 / 车流与交通安全</span>
+        <span className="task-badge">TASK 2.1 / 光柱与实时导航</span>
       </header>
 
       <div className="scene-controls">
+        <section className="navigation-panel" aria-label="自由导航" style={{ borderTopColor: selectedTarget ? NAVIGATION_COLORS[selectedTarget.kind] : undefined }}>
+          <header className="navigation-heading">
+            <h2>街区导航</h2>
+            {isRiding ? <span>北向全城</span> : <button className="return-ride" type="button" data-view="ride" onClick={() => onViewChange('ride')}>返回骑行</button>}
+          </header>
+          <MiniMap engine={engine} />
+          <div className="navigation-legend" aria-label="地图图例">
+            {navigationKinds.map(({ kind, label }) => <span key={kind}><i data-kind={kind} style={{ backgroundColor: NAVIGATION_COLORS[kind] }} />{label}</span>)}
+          </div>
+          <label className="navigation-select-label" htmlFor="navigation-target">优先导航地点</label>
+          <select id="navigation-target" className="navigation-select" aria-label="优先导航地点" value={navigation?.targetId ?? ''} disabled={!navigation} onChange={(event) => onNavigationTargetChange(event.target.value || null)}>
+            <option value="">不设置优先目标</option>
+            {navigationKinds.map(({ kind, label }) => (
+              <optgroup key={kind} label={`${label}地点`}>
+                {navigation?.targets.filter((target) => target.kind === kind).map((target) => <option key={target.id} value={target.id}>{label} · {target.name}</option>)}
+              </optgroup>
+            ))}
+          </select>
+          <div className="navigation-readout" data-arrived={navigation?.arrived ?? false}>
+            <strong>{!navigation ? '连接中' : !selectedTarget ? '未选目标' : navigation.arrived ? '已到达目标点' : `${Math.ceil(navigation.distance)} m`}</strong>
+            <span>{selectedTarget ? navigation?.arrived ? `${selectedTarget.radius}m 范围内` : '沿路距离' : `${navigation?.targets.length ?? 0} 个地点`}</span>
+          </div>
+          <p className="navigation-note">自由导航 · 尚未接单{!isRiding && ' · 已驻车'}</p>
+        </section>
+
+        <aside className="inspection-stack" aria-label="驾驶数据与城市检查">
+        <details className="drive-inspector">
+          <summary>驾驶与交通 <small>{speed} km/h · {rider ? `${rider.battery.toFixed(0)}%` : '—'}</small></summary>
         <section className="ride-card" aria-label="实时驾驶数据与操作">
           <div className="ride-heading">
             <h2>{isRiding ? '街区试骑' : '检查模式 · 已驻车'}</h2>
@@ -119,8 +158,8 @@ export function ScaffoldStatus({
               className="reset-rider"
               type="button"
               data-action="reset-rider"
-              title="恢复起点与电量，清零里程；重置车流时钟、车辆与安全记录"
-              aria-label="回到起点，恢复电量并清零里程，同时重置车流时钟、车辆与安全记录"
+              title="恢复起点、电量与默认导航；清零里程，重置车流时钟、车辆与安全记录"
+              aria-label="回到起点，恢复电量与默认导航，清零里程，同时重置车流时钟、车辆与安全记录"
               disabled={!snapshot}
               onClick={onResetRider}
             >
@@ -131,7 +170,7 @@ export function ScaffoldStatus({
           <section className="traffic-status" aria-label="实时车流与交通安全">
             <h3>街区车流 <small>{traffic ? `${traffic.vehicleCount} 辆 · ${isRiding ? '运行中' : '已冻结'}` : '待连接'}</small></h3>
             <dl className="traffic-counts">
-              <div><dt>行驶</dt><dd>{traffic ? traffic.vehicleCount - traffic.queuedCount : '—'}</dd></div>
+              <div><dt>{isRiding ? '行驶' : '未排队'}</dt><dd>{traffic ? traffic.vehicleCount - traffic.queuedCount : '—'}</dd></div>
               <div><dt>排队</dt><dd>{traffic?.queuedCount ?? '—'}</dd></div>
               <div><dt>闯红灯</dt><dd>{traffic?.redLightCount ?? '—'}</dd></div>
               <div><dt>碰撞</dt><dd>{traffic?.collisionCount ?? '—'}</dd></div>
@@ -189,10 +228,11 @@ export function ScaffoldStatus({
                   ))}
                 </ol>
               ) : <p>{traffic ? '暂无安全事件。' : '安全记录待连接。'}</p>}
-              <p>回到起点会重置骑手、车流时钟与车辆，并清空安全记录。</p>
+              <p>回到起点会重置骑手与车流、清空安全记录，并恢复默认导航。</p>
             </div>
           </details>
         </section>
+        </details>
 
         <details className="city-explorer">
           <summary>城市与模型检查 <small>{cityViews.length} 个视角 · 渲染 / 地图数据</small></summary>
@@ -232,7 +272,7 @@ export function ScaffoldStatus({
                 </button>
               ))}
             </div>
-            <p id="rider-preview-note" className="inspection-note">模型状态仅作原地演示，不是实际驾驶。回到起点会恢复骑手位置与电量、清零里程，重置车流时钟、车辆并清空安全记录。</p>
+            <p id="rider-preview-note" className="inspection-note">模型状态仅作原地演示，不是实际驾驶。回到起点会恢复骑手位置与电量、清零里程，重置车流时钟、车辆与安全记录，并恢复默认导航。</p>
 
             <section className="render-status" aria-label="实时渲染状态">
               <h3>实时渲染</h3>
@@ -263,7 +303,7 @@ export function ScaffoldStatus({
                 </dl>
                 <p className="city-districts">{CITY_LAYOUT.districts.map((district) => district.name).join(' / ')}</p>
                 <h3>预留交互点坐标 <span>(X, Z) · 米</span></h3>
-                <p className="city-coordinate-note">尚无交互；路侧接入点，+X 向东、+Z 向南</p>
+                <p className="city-coordinate-note">可自由导航，暂无取送交互；+X 向东、+Z 向南</p>
                 <ul className="city-landmarks">
                   {cityPoints.map((point) => (
                     <li key={point.id}>
@@ -277,12 +317,13 @@ export function ScaffoldStatus({
             </details>
           </div>
         </details>
+        </aside>
       </div>
 
       <footer className="scene-footer">
         <div className="scene-caption">
-          <h2><Sun size={14} aria-hidden="true" />先练稳，再出发。</h2>
-          <p>车流与交通安全 · 暂无订单</p>
+          <h2><Sun size={14} aria-hidden="true" />看清方向，再出发。</h2>
+          <p>沿道路导航试骑 · 暂无订单</p>
         </div>
         <div className="engine-summary">
           <span className="engine-state" data-ready={snapshot !== null}>{snapshot ? '引擎运行中' : '正在初始化'}</span>

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useState } from 'react'
 import { GameViewport } from './components/GameViewport'
 import { ScaffoldStatus } from './components/ScaffoldStatus'
 import type { GameEngine } from './game/gameEngine'
@@ -7,32 +7,31 @@ import './App.css'
 
 export default function App() {
   const [snapshot, setSnapshot] = useState<EngineSnapshot | null>(null)
-  const engineRef = useRef<GameEngine | null>(null)
-  const handleEngineReady = useCallback((engine: GameEngine | null) => {
-    engineRef.current = engine
-  }, [])
+  const [engine, setEngine] = useState<GameEngine | null>(null)
 
   function selectView(view: CityView) {
-    engineRef.current?.setCityView(view)
+    engine?.setCityView(view)
   }
 
   function selectRiderPreview(mode: RiderPreviewMode) {
-    engineRef.current?.setRiderPreviewMode(mode)
+    engine?.setRiderPreviewMode(mode)
   }
 
   function selectCamera(mode: RideCameraMode) {
-    engineRef.current?.setRideCameraMode(mode)
+    engine?.setRideCameraMode(mode)
   }
 
   function resetRider() {
-    engineRef.current?.resetRider()
+    engine?.resetRider()
   }
 
   return (
     <main className="game-shell">
-      <GameViewport onSnapshot={setSnapshot} onEngineReady={handleEngineReady} />
+      <GameViewport onSnapshot={setSnapshot} onEngineReady={setEngine} />
       <ScaffoldStatus
+        engine={engine}
         snapshot={snapshot}
+        onNavigationTargetChange={(id) => engine?.setNavigationTarget(id)}
         onViewChange={selectView}
         onRiderPreviewChange={selectRiderPreview}
         onCameraChange={selectCamera}
