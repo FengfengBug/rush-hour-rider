@@ -1,0 +1,323 @@
+.rider-phone,
+.rider-phone * { box-sizing: border-box; }
+
+.rider-phone {
+  --phone-ink: #282d2b;
+  --phone-muted: #646960;
+  --phone-yellow: #ffd25b;
+  --phone-green: #24734f;
+  --phone-red: #b33a35;
+  position: absolute;
+  right: 26px;
+  bottom: 65px;
+  z-index: 30;
+  width: 286px;
+  max-width: calc(100vw - 52px);
+  padding: 5px;
+  border: 1px solid #8c8d81;
+  border-radius: 24px;
+  color: var(--phone-ink);
+  background: linear-gradient(135deg, #6c7068, #252925 30%, #151b18 80%, #75796c);
+  box-shadow: 0 12px 32px #18221c40, 0 2px 5px #0e181c33, inset 0 0 0 1px #d4d3bb35;
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+  transition: width 160ms ease, border-radius 160ms ease;
+}
+
+.rider-phone[data-open="true"] {
+  width: 330px;
+  height: min(600px, 80dvh, calc(100dvh - 92px));
+  border-radius: 30px;
+}
+
+.rider-phone[data-open="true"]::after {
+  position: absolute;
+  top: 92px;
+  right: -3px;
+  width: 3px;
+  height: 35px;
+  border-radius: 0 3px 3px 0;
+  background: #5a6055;
+  content: "";
+}
+
+.rider-phone button,
+.rider-phone select {
+  min-width: 0;
+  min-height: 32px;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  line-height: 1.45;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rider-phone button { appearance: none; }
+.rider-phone button:disabled,
+.rider-phone select:disabled { cursor: not-allowed; }
+.rider-phone button:focus-visible,
+.rider-phone select:focus-visible,
+.rider-phone summary:focus-visible,
+.rider-phone-content:focus-visible { outline: 2px solid #175e75; outline-offset: -3px; }
+.rider-phone p,
+.rider-phone h2,
+.rider-phone h3,
+.rider-phone dl,
+.rider-phone dd { margin: 0; }
+.rider-phone p,
+.rider-phone dd,
+.rider-phone strong { overflow-wrap: anywhere; }
+.rider-phone svg { flex-shrink: 0; }
+
+.rider-phone .rider-phone-peek {
+  display: block;
+  width: 100%;
+  padding: 10px 12px 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(125deg, #ffe58d, #ffd05d);
+  text-align: left;
+}
+
+.rider-phone-peek-heading,
+.rider-phone-peek-brand,
+.rider-phone-peek-footer,
+.rider-phone-statusbar,
+.rider-phone-status-icons,
+.rider-phone-vehicle-battery,
+.rider-phone-header,
+.rider-phone-section-heading,
+.rider-phone-offer-heading,
+.rider-phone-offer-fee,
+.rider-phone-countdown,
+.rider-phone-message-heading { display: flex; align-items: center; }
+.rider-phone-peek-heading { flex-wrap: wrap; gap: 4px 7px; }
+.rider-phone-peek-brand { gap: 3px; margin-right: auto; font-size: 14px; font-weight: 800; letter-spacing: -0.04em; }
+.rider-phone-peek-brand svg { fill: currentColor; }
+.rider-phone-peek-held { color: #51482d; font-weight: 650; }
+.rider-phone-new-badge { padding: 1px 6px; border-radius: 9px; color: #fffaf4; background: #b83632; font-size: 12px; font-weight: 750; white-space: nowrap; }
+.rider-phone-peek-order { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; margin-top: 8px; }
+.rider-phone-peek-clock,
+.rider-phone-peek-destination { display: flex; flex-direction: column; min-width: 0; }
+.rider-phone-peek-clock > span,
+.rider-phone-peek-destination > span { color: #605435; font-size: 12px; }
+.rider-phone-peek-clock strong { color: #295d43; font-size: 16px; line-height: 1.5; letter-spacing: -0.03em; white-space: nowrap; }
+.rider-phone-peek-destination { padding-left: 10px; border-left: 1px solid #9d833737; }
+.rider-phone-peek-destination strong { font-size: 13px; line-height: 1.6; }
+.rider-phone-peek-order[data-critical="true"] .rider-phone-peek-clock strong { color: #98362d; animation: rider-phone-urgent-pulse 1.8s ease-in-out infinite; }
+.rider-phone-peek-empty { display: block; margin-top: 8px; font-size: 13px; font-weight: 600; }
+.rider-phone-peek-footer { justify-content: space-between; gap: 5px; margin-top: 7px; padding-top: 5px; border-top: 1px solid #9d833737; color: #5e512f; font-size: 12px; }
+.rider-phone-peek-footer kbd { padding: 0 4px; border: 1px solid #ae934f65; border-radius: 4px; color: #47472d; background: #fff9e355; font: inherit; font-weight: 700; }
+.rider-phone .rider-phone-peek:hover { background: linear-gradient(125deg, #ffeba4, #ffd669); }
+
+.rider-phone-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; border: 1px solid #121c1670; border-radius: 24px; background: #f3f3ec; animation: rider-phone-reveal 160ms ease-out; }
+.rider-phone-top { flex: none; background: linear-gradient(110deg, #ffe28a, #ffd05b); }
+.rider-phone-hardware { display: flex; justify-content: center; align-items: center; gap: 7px; height: 14px; }
+.rider-phone-hardware i { width: 42px; height: 4px; border: 1px solid #242d28; border-radius: 5px; background: #394138; box-shadow: inset 0 1px 2px #1118; }
+.rider-phone-hardware b { width: 6px; height: 6px; border: 2px solid #3c473b; border-radius: 50%; background: #152424; box-shadow: 0 0 0 1px #b9944260; }
+.rider-phone-statusbar { justify-content: space-between; gap: 6px; padding: 1px 13px 4px; color: #454932; font-size: 12px; line-height: 18px; }
+.rider-phone-statusbar strong { margin-left: 3px; font-weight: 750; }
+.rider-phone-status-icons { gap: 7px; }
+.rider-phone-signal { display: inline-flex; align-items: center; }
+.rider-phone-vehicle-battery { gap: 5px; font-weight: 600; white-space: nowrap; }
+.rider-phone-vehicle-battery[data-low="true"] { color: #95372e; }
+.rider-phone-battery-icon { position: relative; display: block; width: 19px; height: 10px; padding: 1px; border: 1px solid currentColor; border-radius: 2px; }
+.rider-phone-battery-icon::after { position: absolute; top: 2px; right: -3px; width: 2px; height: 4px; border-radius: 0 1px 1px 0; background: currentColor; content: ""; }
+.rider-phone-battery-icon i { display: block; height: 100%; border-radius: 1px; background: currentColor; }
+.rider-phone-header { gap: 9px; min-height: 63px; padding: 6px 13px 12px; }
+.rider-phone-logo { display: grid; place-items: center; flex: none; width: 39px; height: 41px; border: 1px solid #26352d; border-radius: 12px; color: #ffdc71; background: #2c3630; box-shadow: 0 2px 2px #695b2425; }
+.rider-phone-brand { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.rider-phone-brand > strong { font-size: 23px; font-weight: 850; line-height: 1.2; letter-spacing: -0.06em; }
+.rider-phone-brand > span { display: flex; align-items: center; gap: 5px; margin-top: 3px; color: #5d522f; font-size: 12px; line-height: 16px; }
+.rider-phone-brand i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+.rider-phone .rider-phone-close { display: grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 0; border: 1px solid #8974344d; border-radius: 10px; color: #41432d; background: #fff9e442; }
+.rider-phone .rider-phone-close:hover { background: #fff9e48c; }
+
+.rider-phone-content { flex: 1; min-width: 0; min-height: 0; padding: 11px; overflow: auto; overscroll-behavior: contain; scroll-padding: 10px; scrollbar-width: thin; scrollbar-color: #b7bdac transparent; }
+.rider-phone .rider-phone-notice { margin-bottom: 10px; padding: 7px 9px; border: 1px solid #d9e1d0; border-radius: 8px; color: #466047; background: #edf1e5; font-size: 12px; line-height: 1.55; }
+.rider-phone .rider-phone-warning { margin-bottom: 9px; padding: 7px 9px; border: 1px solid #e5d6b3; border-radius: 7px; color: #7c571f; background: #fff2d4; font-size: 12px; line-height: 1.6; }
+.rider-phone-section-heading { flex-wrap: wrap; justify-content: space-between; gap: 3px 8px; margin-bottom: 9px; }
+.rider-phone-section-heading h2 { font-size: 15px; font-weight: 800; line-height: 1.5; letter-spacing: -0.03em; }
+.rider-phone-section-heading > span { color: var(--phone-muted); font-size: 12px; }
+.rider-phone-section-heading b { color: #3b4e3e; }
+.rider-phone-card-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.rider-phone-card { min-width: 0; padding: 11px; border: 1px solid #dfe2d7; border-radius: 13px; background: #fffefa; box-shadow: 0 2px 3px #263b2110; }
+.rider-phone-offer-heading { flex-wrap: wrap; justify-content: space-between; gap: 4px 7px; margin-bottom: 10px; }
+.rider-phone-order-id { color: #6a6c60; font-size: 12px; }
+.rider-phone-on-the-way { display: inline-flex; align-items: center; gap: 3px; padding: 2px 5px; border: 1px solid #cbdcc5; border-radius: 5px; color: #2d6645; background: #eff5e9; font-size: 12px; font-weight: 600; cursor: help; }
+.rider-phone-route { display: grid; gap: 11px; }
+.rider-phone-route > div { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; min-width: 0; }
+.rider-phone-route > div:first-child::after { position: absolute; top: 24px; bottom: -8px; left: 10px; border-left: 1px dashed #d9dace; content: ""; }
+.rider-phone-route dt { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; color: #875c16; background: #fff0c8; font-size: 12px; font-weight: 750; line-height: 22px; }
+.rider-phone-route > div:last-child dt { color: #2d6748; background: #e7f0df; }
+.rider-phone-route dd { min-width: 0; padding-top: 1px; color: #353b31; font-size: 14px; font-weight: 650; line-height: 1.55; overflow-wrap: anywhere; }
+.rider-phone-route[data-stage="delivery"] > div:first-child dd { color: #72776b; font-size: 12px; font-weight: 400; }
+.rider-phone-route[data-stage="delivery"] > div:last-child dd { font-weight: 800; }
+.rider-phone-route[data-stage="pickup"] > div:first-child dd { font-weight: 800; }
+.rider-phone-offer-fee { justify-content: space-between; flex-wrap: wrap; gap: 2px 8px; margin-top: 12px; padding-top: 8px; border-top: 1px solid #eeeee5; }
+.rider-phone-offer-fee > span { color: var(--phone-muted); font-size: 12px; }
+.rider-phone-offer-fee strong { color: #86511a; font-size: 25px; font-weight: 800; line-height: 1.2; letter-spacing: -0.06em; }
+.rider-phone-offer-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 9px 0; }
+.rider-phone-offer-metrics dt { color: var(--phone-muted); font-size: 12px; }
+.rider-phone-offer-metrics dd { margin-top: 1px; font-size: 17px; font-weight: 750; line-height: 1.4; }
+.rider-phone-offer-metrics dd > span { font-size: 12px; font-weight: 500; }
+.rider-phone-offer-metrics dd[data-expiring="true"] { color: var(--phone-red); }
+.rider-phone .rider-phone-primary,
+.rider-phone .rider-phone-secondary { display: flex; justify-content: center; align-items: center; gap: 5px; width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid #cfa640; border-radius: 8px; color: #3b3524; background: #ffd567; font-size: 13px; font-weight: 750; line-height: 1.45; overflow-wrap: anywhere; transition: background-color 120ms ease; }
+.rider-phone .rider-phone-primary > span { margin-left: auto; font-size: 17px; line-height: 18px; }
+.rider-phone .rider-phone-primary:hover:not(:disabled) { background: #ffc947; }
+.rider-phone .rider-phone-secondary { border-color: #d5dccb; color: #3c5a42; background: #f4f7ef; font-size: 12px; font-weight: 650; }
+.rider-phone .rider-phone-secondary:hover:not(:disabled) { border-color: #a4b395; background: #eaf0e1; }
+.rider-phone .rider-phone-primary:disabled,
+.rider-phone .rider-phone-secondary:disabled { opacity: 1; border-color: #d9dccf; color: #77796d; background: #eceee5; font-weight: 500; }
+.rider-phone .rider-phone-footnote { margin-top: 10px; color: var(--phone-muted); font-size: 12px; line-height: 1.65; }
+.rider-phone-empty { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 19px 12px; border: 1px dashed #cdd4c3; border-radius: 12px; color: #727b68; background: #fafbf5; text-align: center; }
+.rider-phone-empty strong { color: #485541; font-size: 14px; }
+.rider-phone-empty p { color: #626e59; font-size: 12px; line-height: 1.7; }
+.rider-phone-empty > button { margin-top: 3px; }
+
+.rider-phone-delivery-card[data-priority="true"] { border-color: #b1bc9e; box-shadow: inset 3px 0 #798e64, 0 2px 3px #263b2110; }
+.rider-phone-delivery-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 10px; }
+.rider-phone-stage { padding: 2px 6px; border-radius: 5px; color: #85591a; background: #fff0cd; font-size: 12px; font-weight: 750; }
+.rider-phone-stage[data-stage="delivery"] { color: #2d6949; background: #e8f2e3; }
+.rider-phone-priority-label { margin-left: auto; color: #4d6943; font-size: 12px; font-weight: 600; }
+.rider-phone-countdown { flex-wrap: wrap; justify-content: space-between; gap: 2px 7px; margin-top: 13px; }
+.rider-phone-countdown strong { color: var(--phone-green); font-size: 21px; font-weight: 800; line-height: 1.3; letter-spacing: -0.04em; }
+.rider-phone-countdown > span { color: var(--phone-muted); font-size: 12px; }
+.rider-phone-progress { height: 5px; margin-top: 7px; overflow: hidden; border-radius: 4px; background: #e9eddf; }
+.rider-phone-progress > span { display: block; height: 100%; border-radius: inherit; background: #4b8b5a; transition: width 120ms linear; }
+.rider-phone-delivery-card[data-critical="true"] .rider-phone-countdown strong { color: var(--phone-red); animation: rider-phone-urgent-pulse 1.8s ease-in-out infinite; }
+.rider-phone-delivery-card[data-critical="true"] .rider-phone-progress { background: #f4dfd7; }
+.rider-phone-delivery-card[data-critical="true"] .rider-phone-progress > span { background: #c95448; }
+.rider-phone .rider-phone-delivery-meta { margin: 6px 0 9px; color: var(--phone-muted); font-size: 12px; line-height: 1.5; }
+.rider-phone .rider-phone-navigate[aria-pressed="true"] { color: #315a3a; border-color: #b5c4a5; background: #eaf1e1; }
+.rider-phone-report { margin-top: 9px; padding-top: 3px; border-top: 1px solid #e6e9de; }
+.rider-phone-report > summary { min-height: 32px; padding: 6px 0; color: #686a5e; font-size: 12px; cursor: pointer; }
+.rider-phone-report > summary::marker { color: #89917a; }
+.rider-phone-report > summary > span { margin-left: 8px; color: #44714a; }
+.rider-phone-report > p { margin-bottom: 8px; color: #71694e; font-size: 12px; line-height: 1.65; }
+.rider-phone-report-label { display: grid; gap: 4px; margin-bottom: 8px; color: var(--phone-muted); font-size: 12px; }
+.rider-phone-report-label > select { width: 100%; padding: 6px; border: 1px solid #ccd5bf; border-radius: 6px; color: #384f34; background: #fffef6; font-size: 12px; }
+.rider-phone-report-label > select:disabled { color: #74776a; background: #efefe6; }
+.rider-phone-report-history { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
+.rider-phone-report-history li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 3px 6px; color: #68785b; font-size: 12px; }
+
+.rider-phone-wallet { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 8px; margin: 0 0 10px; padding: 14px 12px; border: 1px solid #384637; border-radius: 12px; color: #fff4cc; background: linear-gradient(135deg, #424e3e, #28392d); }
+.rider-phone-wallet > div > span { display: flex; align-items: center; gap: 6px; color: #e4e7c9; font-size: 12px; }
+.rider-phone-wallet strong { display: block; margin-top: 4px; font-size: 30px; font-weight: 750; line-height: 1.2; letter-spacing: -0.05em; }
+.rider-phone-wallet > p { color: #dae0c6; font-size: 12px; }
+.rider-phone-wallet b { color: #fff4cc; font-size: 16px; }
+.rider-phone .phone-ledger.order-panel { width: 100%; max-height: none; min-height: 0; margin-bottom: 14px; padding: 3px 10px 7px; overflow: visible; border: 1px solid #dce0d1; border-radius: 10px; color: #3c4d34; background: #fafbf3; font-size: 12px; line-height: 1.65; }
+.rider-phone .phone-ledger summary { min-height: 32px; font-size: 12px; line-height: 1.6; }
+.rider-phone .phone-ledger .order-panel-completed { border-top: 0; }
+.rider-phone .phone-ledger .order-panel-rules { margin-top: 3px; }
+.rider-phone .phone-ledger .order-panel-note,
+.rider-phone .phone-ledger h4,
+.rider-phone .phone-ledger h3 > span { font-size: 12px; }
+.rider-phone .phone-ledger .order-panel-bill > summary { padding: 5px 0; }
+.rider-phone .phone-ledger .order-panel-bill > summary > span { margin-left: 0; padding-left: 5px; }
+.rider-phone .phone-ledger .order-panel-list > li { padding: 7px; background: #fffff8; }
+.rider-phone .phone-ledger .order-panel-route { font-size: 13px; }
+.rider-phone .phone-ledger .order-panel-record-data { font-size: 12px; }
+.rider-phone-messages { min-width: 0; }
+.rider-phone-message-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.rider-phone-message-list > li { min-width: 0; padding: 9px 10px; border: 1px solid #e0e2d7; border-left: 3px solid #bac1af; border-radius: 0 9px 9px 0; background: #fffef9; }
+.rider-phone-message-list > li[data-source="merchant"] { border-left-color: #cf9c40; }
+.rider-phone-message-list > li[data-source="customer"] { border-left-color: #b06d54; }
+.rider-phone-message-list > li[data-source="rider"] { border-left-color: #6d8e97; }
+.rider-phone-message-list > li[data-source="payment"] { border-left-color: #568354; background: #f4f8ed; }
+.rider-phone-message-heading { flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 3px 5px; }
+.rider-phone-message-heading strong { color: #48523e; font-size: 12px; font-weight: 750; }
+.rider-phone-message-heading > span { color: #73766c; font-size: 12px; white-space: nowrap; }
+.rider-phone-message-list p { margin: 5px 0 3px; color: #384231; font-size: 13px; line-height: 1.65; }
+.rider-phone-message-order { color: #757b69; font-size: 12px; }
+
+.rider-phone-tabs { display: grid; flex: none; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 3px 5px 0; border-top: 1px solid #dce0d4; background: #fffdf5; }
+.rider-phone .rider-phone-tabs button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; min-height: 54px; padding: 5px 2px; border: 0; border-radius: 8px; color: #6b705f; background: transparent; font-size: 12px; line-height: 18px; white-space: nowrap; }
+.rider-phone .rider-phone-tabs button[aria-pressed="true"] { color: #58471d; background: #fff0c9; font-weight: 800; }
+.rider-phone .rider-phone-tabs button:hover { color: #494730; background: #f7f2e1; }
+.rider-phone .rider-phone-tabs button[aria-pressed="true"]:hover { background: #ffebba; }
+.rider-phone-tab-icon { display: flex; }
+.rider-phone-tab-count { display: inline-grid; place-items: center; min-width: 15px; height: 15px; margin-left: 3px; padding: 0 3px; border-radius: 5px; color: #556347; background: #e7ecd9; font-size: 12px; line-height: 15px; }
+.rider-phone-tab-badge { position: absolute; top: 1px; right: 17px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 9px; color: #fffdf4; background: #b73532; box-shadow: 0 0 0 2px #fffdf5; font-size: 12px; line-height: 16px; font-weight: 750; }
+.rider-phone-home-indicator { display: flex; flex: none; align-items: center; justify-content: center; height: 13px; background: #fffdf5; }
+.rider-phone-home-indicator i { width: 71px; height: 3px; border-radius: 3px; background: #606554; }
+
+@keyframes rider-phone-urgent-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes rider-phone-reveal {
+  from { opacity: 0.6; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Keep the shell below 35% of the viewport even between mobile and desktop widths. */
+@media (min-width: 601px) and (max-width: 900px) and (min-height: 501px) {
+  .rider-phone[data-open="true"] { height: min(600px, 60dvh); }
+}
+
+@media (max-width: 600px), (max-height: 500px) {
+  .rider-phone { right: 10px; bottom: 62px; max-width: 85vw; padding: 3px; border-radius: 19px; }
+  .rider-phone[data-open="true"] { border-radius: 21px; }
+  .rider-phone[data-open="true"]::after { top: 70px; height: 25px; }
+  .rider-phone-screen { border-radius: 17px; }
+  .rider-phone-hardware { height: 7px; }
+  .rider-phone-hardware i { width: 30px; height: 3px; }
+  .rider-phone-hardware b { width: 4px; height: 4px; border-width: 1px; }
+  .rider-phone-statusbar { padding: 1px 9px 0; font-size: 12px; line-height: 16px; }
+  .rider-phone-status-icons { gap: 5px; }
+  .rider-phone-header { gap: 6px; min-height: 35px; padding: 2px 8px 3px; }
+  .rider-phone-logo { width: 26px; height: 27px; border-radius: 8px; }
+  .rider-phone-logo svg { width: 19px; height: 19px; }
+  .rider-phone-brand { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 2px 5px; }
+  .rider-phone-brand > strong { font-size: 18px; line-height: 1.3; }
+  .rider-phone-brand > span { margin-top: 0; font-size: 12px; }
+  .rider-phone-brand > span i { display: none; }
+  .rider-phone-brand > span { max-width: 36px; height: 17px; overflow: hidden; white-space: nowrap; }
+  .rider-phone .rider-phone-close { border-radius: 8px; }
+  .rider-phone-content { padding: 8px; scroll-padding: 8px; }
+  .rider-phone .rider-phone-notice { padding: 5px 7px; margin-bottom: 7px; }
+  .rider-phone-section-heading { margin-bottom: 7px; }
+  .rider-phone-section-heading h2 { font-size: 14px; }
+  .rider-phone-card-list { gap: 8px; }
+  .rider-phone-card { padding: 9px; border-radius: 10px; }
+  .rider-phone-offer-heading,
+  .rider-phone-delivery-heading { margin-bottom: 8px; }
+  .rider-phone-route { gap: 8px; }
+  .rider-phone-route dd { font-size: 13px; }
+  .rider-phone-route > div:first-child::after { bottom: -5px; }
+  .rider-phone-offer-fee { margin-top: 9px; padding-top: 7px; }
+  .rider-phone-offer-fee strong { font-size: 22px; }
+  .rider-phone-offer-metrics { padding: 7px 0; }
+  .rider-phone-countdown strong { font-size: 19px; }
+  .rider-phone-tabs { padding: 0 3px; }
+  .rider-phone .rider-phone-tabs button { min-height: 34px; padding: 5px 1px; border-radius: 6px; line-height: 18px; }
+  .rider-phone-tab-icon { display: none; }
+  .rider-phone-tab-badge { top: 0; right: 1px; min-width: 13px; height: 14px; padding: 0 2px; font-size: 12px; line-height: 14px; box-shadow: 0 0 0 1px #fffdf5; }
+  .rider-phone-tab-count { margin-left: 2px; }
+  .rider-phone-home-indicator { height: 6px; }
+  .rider-phone-home-indicator i { width: 48px; height: 2px; }
+  .rider-phone .rider-phone-peek { padding: 8px 10px 6px; border-radius: 14px; }
+}
+
+@media (max-width: 600px) {
+  .rider-phone[data-open="true"] { width: min(330px, 85vw); height: 40dvh; }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .rider-phone[data-open="true"] { width: min(330px, 32vw); max-width: 32vw; height: min(80dvh, calc(100dvh - 76px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rider-phone,
+  .rider-phone *,
+  .rider-phone *::before,
+  .rider-phone *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

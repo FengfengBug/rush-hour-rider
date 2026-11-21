@@ -1,4 +1,4 @@
-import type { CityLandmark, CityLayout, DeliveryOrder, OrderOffer, OrderSnapshot, Point2 } from './types'
+import type { CityLandmark, CityLayout, DeliveryOrder, OrderMessage, OrderOffer, OrderReportReason, OrderSnapshot, Point2 } from './types'
 
 export const MAX_ACTIVE_ORDERS = 3
 const OFFER_LIFETIME = 40
@@ -27,6 +27,9 @@ export class OrderManager {
   private readonly landmarks: Map<string, CityLandmark>
   private readonly spawn: Point2
   private elapsed = 0
+  private shiftId = 0
+  private messages: OrderMessage[] = []
+  private readonly reminded = new Set<string>()
   private nextOfferAt = 0
   private sequence = 0
   private seed = 22
@@ -46,6 +49,9 @@ export class OrderManager {
   }
 
   reset(): void {
+    this.shiftId += 1
+    this.messages = []
+    this.reminded.clear()
     this.elapsed = 0
     this.sequence = 0
     this.seed = 22
@@ -93,12 +99,23 @@ export class OrderManager {
       acceptedPosition: { x: rider.x, z: rider.z }, deadline: this.elapsed + estimate.idealSec,
       pickedUpAt: null, completedAt: null, actualSec: 0,
       ledger: { ridingSec: 0, trafficWaitSec: 0, merchantDelaySec: 0, lastMileSec: 0, detourSec: 0, idleSec: 0 },
-      settlement: null,
+      settlement: null, reports: [],
     })
     this.offers = this.offers.filter((entry) => entry.id !== id)
     this.priorityId ??= id
     this.notice = `${id} 已接单，前往${this.landmarks.get(offer.merchantId)!.name}取餐。`
+    this.addMessage(id, 'system', this.notice, this.elapsed)
     this.revision += 1
+    return true
+  }
+
+  report(id: string, reason: OrderReportReason): boolean {
+    const order = this.active.find((entry) => entry.id === id)
+    if (!order || order.reports.some((entry) => entry.reason === reason)) return false
+    const labels: Record<OrderReportReason, string> = { traffic: '道路拥堵', merchant: '商家问题', address: '地址问题' }
+    order.reports.push({ reason, at: this.elapsed })
+    this.notice = `${id} 已记录“${labels[reason]}”报备；计时与计费不变。`
+    this.addMessage(id, 'rider', this.notice, this.elapsed)
     return true
   }
 
@@ -116,6 +133,7 @@ export class OrderManager {
           order.status = 'delivery'
           order.pickedUpAt = startedAt + deltaSeconds * fraction
           this.notice = `${order.id} 已取餐，送往${this.landmarks.get(order.deliveryId)!.name}。`
+          this.addMessage(order.id, 'merchant', `${this.landmarks.get(order.merchantId)!.name}：餐品已交接，请送往${this.landmarks.get(order.deliveryId)!.name}。`, order.pickedUpAt)
           this.revision += 1
         }
       }
@@ -129,6 +147,11 @@ export class OrderManager {
       const spent = deltaSeconds * (fraction ?? 1)
       order.ledger[category] += spent
       order.actualSec += spent
+      const reminderAt = Math.max(order.acceptedAt, order.deadline - 15)
+      if (!this.reminded.has(order.id) && startedAt + spent >= reminderAt) {
+        this.reminded.add(order.id)
+        this.addMessage(order.id, 'customer', '快到配送时限了，麻烦留意送达进度。', reminderAt)
+      }
       if (fraction === null) continue
       const at = startedAt + deltaSeconds * fraction
       order.status = 'completed'
@@ -144,6 +167,7 @@ export class OrderManager {
       this.incomeCents += order.settlement.totalCents
       this.completed.unshift(order)
       this.notice = `${order.id} 已送达，${onTime ? '准时奖已入账' : '超时扣款已明细记账'}。`
+      this.addMessage(order.id, 'payment', `配送完成，实得 ¥${(order.settlement.totalCents / 100).toFixed(2)}；${onTime ? '含准时奖 ¥1.50' : `超时扣款 ¥${(penaltyCents / 100).toFixed(2)}`}。`, at)
       this.revision += 1
     }
     this.active = this.active.filter((order) => order.status !== 'completed')
@@ -162,13 +186,26 @@ export class OrderManager {
     const copy = (order: DeliveryOrder): DeliveryOrder => ({
       ...order, acceptedPosition: { ...order.acceptedPosition }, ledger: { ...order.ledger },
       settlement: order.settlement ? { ...order.settlement } : null,
+      reports: order.reports.map((report) => ({ ...report })),
     })
+    const target = this.priorityTargetId ? this.landmarks.get(this.priorityTargetId)!.access.position : null
     return {
+      shiftId: this.shiftId,
       elapsedSec: this.elapsed, nextOfferInSec: Math.max(0, this.nextOfferAt - this.elapsed),
-      offers: this.offers.map((offer) => ({ ...offer, ...this.estimate(offer.merchantId, offer.deliveryId, rider) })),
+      messages: this.messages.map((message) => ({ ...message })),
+      offers: this.offers.map((offer) => {
+        const merchant = this.landmarks.get(offer.merchantId)!.access.position
+        const delivery = this.landmarks.get(offer.deliveryId)!.access.position
+        const extraDistance = target ? distance(rider, merchant) + distance(merchant, delivery) + distance(delivery, target) - distance(rider, target) : Infinity
+        return { ...offer, ...this.estimate(offer.merchantId, offer.deliveryId, rider), onTheWay: extraDistance <= 25 }
+      }),
       active: this.active.map(copy), completed: this.completed.map(copy),
       priorityId: this.priorityId, incomeCents: this.incomeCents, paused, notice: this.notice,
     }
+  }
+
+  private addMessage(orderId: string, kind: OrderMessage['kind'], text: string, at: number): void {
+    this.messages.push({ id: this.messages.length + 1, orderId, kind, text, at })
   }
 
   private random(): number {

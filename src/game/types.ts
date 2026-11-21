@@ -243,6 +243,16 @@ export interface OrderSettlement {
   totalCents: number
 }
 
+export type OrderReportReason = 'traffic' | 'merchant' | 'address'
+
+export interface OrderMessage {
+  id: number
+  orderId: string
+  at: number
+  kind: 'system' | 'merchant' | 'customer' | 'rider' | 'payment'
+  text: string
+}
+
 export interface DeliveryOrder extends OrderOffer {
   status: 'pickup' | 'delivery' | 'completed'
   acceptedAt: number
@@ -253,12 +263,15 @@ export interface DeliveryOrder extends OrderOffer {
   actualSec: number
   ledger: OrderTimeLedger
   settlement: OrderSettlement | null
+  reports: { reason: OrderReportReason; at: number }[]
 }
 
 export interface OrderSnapshot {
+  shiftId: number
   elapsedSec: number
   nextOfferInSec: number
-  offers: readonly OrderOffer[]
+  messages: readonly OrderMessage[]
+  offers: readonly (OrderOffer & { onTheWay: boolean })[]
   active: readonly DeliveryOrder[]
   completed: readonly DeliveryOrder[]
   priorityId: string | null

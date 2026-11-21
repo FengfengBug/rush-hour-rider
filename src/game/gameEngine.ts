@@ -23,7 +23,7 @@ import { buildTrafficVisuals } from './trafficVisuals'
 import { NavigationSystem } from './navigationSystem'
 import { buildNavigationVisuals } from './navigationVisuals'
 import { OrderManager } from './orderManager'
-import type { CityView, Direction, EngineSnapshot, NavigationFrameListener, RideCameraMode, RiderPreviewMode } from './types'
+import type { CityView, Direction, EngineSnapshot, NavigationFrameListener, OrderReportReason, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
   'food-street': 'shaxian-snacks',
@@ -207,8 +207,18 @@ export class GameEngine {
   }
 
   prioritizeOrder(id: string) {
-    if (!this.orders.prioritize(id)) return
+    if (this.view !== 'ride' || document.hidden || !this.orders.prioritize(id)) return
     this.setNavigationTarget(this.orders.priorityTargetId)
+  }
+
+  reportOrder(id: string, reason: OrderReportReason) {
+    if (this.view !== 'ride' || document.hidden || !this.orders.report(id, reason)) return false
+    this.lastSnapshotTime = 0
+    return true
+  }
+
+  releaseDrivingKeys() {
+    this.keys.clear()
   }
 
   private syncOrderNavigation() {
@@ -282,7 +292,7 @@ export class GameEngine {
     this.renderer.domElement.remove()
   }
 
-  private readonly focusCanvas = () => this.renderer.domElement.focus({ preventScroll: true })
+  readonly focusCanvas = () => this.renderer.domElement.focus({ preventScroll: true })
 
   private readonly clearInput = () => {
     this.keys.clear()

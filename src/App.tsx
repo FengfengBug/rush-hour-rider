@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { GameViewport } from './components/GameViewport'
 import { ScaffoldStatus } from './components/ScaffoldStatus'
+import { RiderPhone } from './components/RiderPhone'
 import type { GameEngine } from './game/gameEngine'
 import type { CityView, EngineSnapshot, RideCameraMode, RiderPreviewMode } from './game/types'
 import './App.css'
@@ -37,6 +38,7 @@ export default function App() {
         onCameraChange={selectCamera}
         onResetRider={resetRider}
       />
+      <RiderPhone key={snapshot?.orders.shiftId ?? 0} engine={engine} snapshot={snapshot} />
     </main>
   )
 }

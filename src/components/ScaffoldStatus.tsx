@@ -2,7 +2,6 @@ import { Bike, Sun } from 'lucide-react'
 import { CITY_LAYOUT } from '../game/cityLayout'
 import { NAVIGATION_COLORS } from '../game/navigationSystem'
 import { MiniMap } from './MiniMap'
-import { OrderPanel } from './OrderPanel'
 import type { GameEngine } from '../game/gameEngine'
 import type { CityView, EngineSnapshot, NavigationKind, RideCameraMode, RiderPreviewMode } from '../game/types'
 
@@ -82,7 +81,7 @@ export function ScaffoldStatus({
             <p>RUSH HOUR RIDER</p>
           </div>
         </div>
-        <span className="task-badge">TASK 2.2 / 订单与真实账本</span>
+        <span className="task-badge">TASK 2.3 / 拟真骑手手机</span>
       </header>
 
       <div className="scene-controls">
@@ -111,8 +110,7 @@ export function ScaffoldStatus({
           <p className="navigation-note">{!isRiding ? '检查中 · 配送与交通暂停' : snapshot?.orders.active.length ? `${snapshot.orders.active.length} 单在途 · 光圈内自动取送` : '接单后显取送点 · 换电仅导航'}</p>
         </section>
 
-        <aside className="inspection-stack" aria-label="订单、驾驶数据与城市检查">
-        <OrderPanel orders={snapshot?.orders ?? null} onAccept={(id) => engine?.acceptOrder(id) ?? false} onPrioritize={(id) => engine?.prioritizeOrder(id)} />
+        <aside className="inspection-stack" aria-label="驾驶数据与城市检查">
         <details className="drive-inspector">
           <summary>驾驶与交通 <small>{speed} km/h · {rider ? `${rider.battery.toFixed(0)}%` : '—'}</small></summary>
         <section className="ride-card" aria-label="实时驾驶数据与操作">
@@ -209,6 +207,7 @@ export function ScaffoldStatus({
             <p className="key-shortcuts">
               <span><kbd>Space</kbd> 急刹</span>
               <span><kbd>Shift</kbd> 耗电助推</span>
+              <span><kbd>Tab</kbd> 收放手机</span>
               <span><kbd>C</kbd> 切镜头</span>
               <span><kbd>H</kbd> 鸣笛（波纹）</span>
             </p>
