@@ -1,66 +1,117 @@
 .game-shell { position: relative; width: 100%; height: 100%; isolation: isolate; }
 .game-viewport { position: absolute; inset: 0; }
 .game-viewport canvas { display: block; width: 100%; height: 100%; }
-.scene-overlay { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: 22px; padding: 30px 36px; pointer-events: none; }
-.scene-header, .scene-brand, .scene-footer, .scene-eyebrow, .render-status, .render-status dl { display: flex; align-items: center; }
-.scene-header { justify-content: space-between; gap: 20px; }
-.scene-brand { gap: 12px; }
-.brand-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; background: #f4be41; }
+.scene-overlay { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: 18px; padding: 26px 30px; pointer-events: none; }
+.scene-overlay > * { min-width: 0; }
+.scene-header, .scene-brand, .scene-footer, .scene-eyebrow, .render-status { display: flex; align-items: center; }
+.scene-header { justify-content: space-between; gap: 16px; }
+.scene-brand { gap: 12px; padding: 8px 12px; border-radius: 14px; background: #fcf8efed; }
+.brand-icon { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 13px; background: #f4be41; }
 .scene-brand h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.05em; }
 .scene-brand p { margin: 3px 0 0; font-size: 9px; font-weight: 650; letter-spacing: 0.15em; }
-.task-badge { padding: 9px 12px; border: 1px solid #6a765731; border-radius: 6px; color: #58604e; background: #f7f8eea8; font-size: 11px; letter-spacing: 0.05em; }
+.task-badge { flex: none; padding: 9px 12px; border: 1px solid #d5d7c7; border-radius: 6px; color: #58604e; background: #faf7edeb; font-size: 11px; letter-spacing: 0.05em; }
 
-.scene-footer { align-items: flex-end; justify-content: space-between; gap: 22px; }
-.scene-eyebrow { gap: 7px; font-size: 11px; letter-spacing: 0.1em; color: #59644d; }
-.scene-caption h2 { margin: 12px 0 9px; font-size: clamp(19px, 2.1vw, 27px); font-weight: 650; letter-spacing: -0.03em; }
-.scene-caption p { margin: 0; color: #5e6852; font-size: 11px; line-height: 1.7; }
-.render-status { flex-direction: column; align-items: stretch; flex-shrink: 0; gap: 14px; padding: 17px 20px; border: 1px solid #fdfef197; border-radius: 12px; background: #f8f9eedb; }
-.engine-state { font-size: 11px; color: #42653a; }
-.engine-state::before { display: inline-block; content: ""; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: #578249; }
-.render-status dl { margin: 0; gap: 24px; }
-.render-status dt { font-size: 10px; color: #6b745d; }
-.render-status dd { margin: 7px 0 0; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.city-explorer { display: flex; flex-direction: column; align-self: start; gap: 10px; width: 232px; max-width: 100%; min-height: 0; max-height: 100%; }
+.city-explorer-intro { flex: none; padding: 10px 12px; border-radius: 8px; background: #fcf8efed; }
+.city-explorer-intro h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0; font-size: 12px; font-weight: 650; line-height: 1.5; }
+.city-explorer-intro h2 span { color: #647363; font-size: 9px; font-weight: 400; }
+.city-explorer-intro p { margin: 5px 0 0; color: #536451; font-size: 10px; line-height: 1.5; }
+.city-views { display: grid; flex: none; gap: 6px; }
+.city-view { --view-color: #416c5d; --view-tint: #e2ede3; display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 36px; padding: 6px 10px; border: 1px solid #d9ddce; border-radius: 8px; color: #465346; background: #fcf8efed; font-size: 12px; line-height: 1.4; text-align: left; white-space: nowrap; cursor: pointer; pointer-events: auto; }
+.city-view[data-view="food-street"], .city-view[data-view="old-neighborhood"] { --view-color: #95593f; --view-tint: #f4e1d5; }
+.city-view[data-view="cbd"] { --view-color: #85621f; --view-tint: #f4ebcd; }
+.city-view:hover { border-color: var(--view-color); background: var(--view-tint); }
+.city-view[aria-pressed="true"] { border-color: var(--view-color); color: var(--view-color); background: var(--view-tint); font-weight: 650; }
+.city-view:focus-visible { outline: 2px solid #3b6756; outline-offset: 3px; }
+.city-view-number { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 5px; color: var(--view-color); background: var(--view-tint); font-size: 10px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.city-view[aria-pressed="true"] .city-view-number { color: #fffaf0; background: var(--view-color); }
 
-.city-data { align-self: start; width: 350px; min-height: 0; max-width: 100%; max-height: 100%; overflow: auto; overscroll-behavior: contain; pointer-events: auto; border: 1px solid #d9ddcd; border-radius: 12px; background: #f8f9f0f5; scrollbar-width: thin; }
-.city-data summary { position: sticky; top: 0; padding: 14px 16px; background: #f8f9f0; font-size: 12px; font-weight: 650; cursor: pointer; }
-.city-data summary:focus-visible { outline: 2px solid #648452; outline-offset: -4px; border-radius: 10px; }
-.city-data summary small { display: block; margin-top: 7px; color: #65715c; font-size: 11px; font-weight: 400; }
-.city-data-body { padding: 0 16px 14px; }
+.city-data { flex: 0 1 auto; width: 100%; min-height: 0; overflow: auto; overscroll-behavior: contain; pointer-events: auto; border: 1px solid #d9ddcd; border-radius: 10px; background: #fcf8eff5; scrollbar-width: thin; scrollbar-color: #a5b29e #fcf8ef; }
+.city-data summary { position: sticky; top: 0; z-index: 1; padding: 10px 12px; color: #435542; background: #fcf8ef; font-size: 11px; font-weight: 650; line-height: 1.5; cursor: pointer; pointer-events: auto; }
+.city-data summary::marker { color: #66856d; }
+.city-data summary:focus-visible { outline: 2px solid #3b6756; outline-offset: -4px; border-radius: 8px; }
+.city-data summary small { display: block; margin-top: 4px; color: #65715c; font-size: 10px; font-weight: 400; }
+.city-data-body { padding: 0 12px 12px; }
 .city-size, .city-districts, .city-coordinate-note { margin: 0; color: #647157; font-size: 10px; line-height: 1.7; }
-.city-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 8px; margin: 15px 0; }
-.city-metrics dt { color: #6b745d; font-size: 10px; }
-.city-metrics dd { margin: 5px 0 0; font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.city-data h2 { display: flex; justify-content: space-between; margin: 17px 0 5px; font-size: 11px; }
-.city-data h2 span { color: #6b745d; font-size: 10px; font-weight: 400; }
+.city-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 8px; margin: 12px 0; }
+.city-metrics dt { color: #65715b; font-size: 10px; }
+.city-metrics dd { margin: 3px 0 0; font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.city-data h3 { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; margin: 14px 0 5px; font-size: 11px; }
+.city-data h3 span { color: #6b745d; font-size: 10px; font-weight: 400; }
 .city-landmarks { margin: 8px 0 0; padding: 0; list-style: none; }
-.city-landmarks li { display: grid; grid-template-columns: 27px minmax(0, 1fr) auto; align-items: baseline; gap: 5px; padding: 9px 0; border-top: 1px solid #e1e5d9; font-size: 11px; }
+.city-landmarks li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: baseline; gap: 4px; padding: 9px 0; border-top: 1px solid #e1e5d9; font-size: 11px; line-height: 1.5; }
 .city-point-kind { color: #718060; font-size: 9px; }
 .city-landmarks code { font-size: 10px; color: #5d6b50; white-space: nowrap; }
 
-@media (max-width: 900px) {
-  .scene-overlay { padding: 22px; gap: 18px; }
-  .scene-footer { align-items: flex-start; flex-direction: column; gap: 16px; }
-  .render-status { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
-  .render-status dl { gap: 22px; }
+.scene-footer { align-items: flex-end; justify-content: space-between; gap: 20px; }
+.scene-caption { min-width: 0; width: fit-content; padding: 10px 12px; border-radius: 8px; background: #fcf8efed; }
+.scene-eyebrow { gap: 6px; color: #53614d; font-size: 10px; line-height: 1.5; }
+.scene-eyebrow svg { flex: none; }
+.scene-caption h2 { margin: 8px 0 6px; font-size: clamp(19px, 2vw, 25px); font-weight: 650; letter-spacing: -0.03em; }
+.scene-caption p { margin: 0; color: #53614d; font-size: 11px; line-height: 1.5; }
+.render-status { flex: 0 1 520px; flex-direction: column; align-items: stretch; min-width: 0; max-width: 60%; gap: 10px; padding: 13px 16px; border: 1px solid #e1e2d4; border-radius: 10px; background: #fcf8efeb; }
+.engine-state { flex: none; color: #4c6747; font-size: 10px; line-height: 1.5; white-space: nowrap; }
+.engine-state::before { display: inline-block; content: ""; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #b99039; }
+.engine-state[data-ready="true"]::before { background: #63866a; }
+.render-status dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(82px, 1.4fr) minmax(0, 0.7fr); gap: 12px; min-width: 0; margin: 0; }
+.render-status dl > div { min-width: 0; }
+.render-status dt { color: #66725c; font-size: 9px; line-height: 1.5; white-space: nowrap; }
+.render-status dd { margin: 4px 0 0; font-size: 12px; font-weight: 650; line-height: 1.5; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (max-width: 900px), (max-height: 560px) {
+  .scene-overlay { padding: 18px; gap: 14px; }
+  .city-explorer { width: min(100%, 620px); gap: 8px; }
+  .city-explorer-intro { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
+  .city-explorer-intro h2 { justify-content: flex-start; gap: 12px; }
+  .city-explorer-intro p { margin: 0; }
+  .city-views { display: flex; flex-wrap: wrap; }
+  .city-view { gap: 7px; min-height: 34px; padding: 6px 9px; font-size: 11px; }
+  .city-view-number { width: 20px; height: 20px; font-size: 9px; }
+  .city-data { width: min(100%, 340px); }
+  .city-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .scene-footer { align-items: stretch; flex-direction: column; gap: 10px; }
+  .scene-caption { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 16px; }
+  .scene-caption h2 { display: none; }
+  .scene-caption p { font-size: 10px; }
+  .render-status { flex: none; width: 100%; max-width: none; flex-direction: row; align-items: center; gap: 18px; padding: 10px 12px; }
+  .render-status dl { flex: 1; }
+}
+
+@media (max-width: 600px) {
+  .render-status { flex-direction: column; align-items: stretch; gap: 7px; }
+  .render-status dl { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
 }
 
 @media (max-width: 480px) {
-  .scene-overlay { padding: 16px; gap: 16px; }
+  .scene-overlay { padding: 14px; gap: 12px; }
+  .scene-header { gap: 10px; }
   .scene-brand { gap: 8px; }
   .brand-icon { width: 37px; height: 37px; border-radius: 10px; }
   .scene-brand h1 { font-size: 21px; }
   .scene-brand p { font-size: 7px; }
   .task-badge { padding: 7px 8px; font-size: 9px; }
-  .scene-caption h2 { font-size: 20px; }
-  .scene-caption p { font-size: 10px; }
-  .render-status { padding: 13px; flex-direction: column; align-items: stretch; gap: 12px; }
-  .render-status dl { justify-content: space-between; gap: 8px; }
-  .render-status dd { font-size: 12px; }
+  .city-views { gap: 5px; }
+  .city-view { gap: 6px; min-height: 32px; padding: 6px 8px; }
+  .city-view-number { width: 18px; height: 18px; }
+  .city-data summary { padding: 9px 11px; }
+  .scene-caption { column-gap: 10px; }
+  .scene-eyebrow { font-size: 9px; }
+}
+
+@media (max-width: 480px) and (max-height: 640px) {
+  .scene-overlay { padding: 10px; gap: 8px; }
+  .scene-brand { padding: 5px 8px; }
+  .city-explorer-intro { padding: 6px 8px; }
+  .city-explorer-intro h2 span { display: none; }
 }
 
 @media (max-height: 440px) {
-  .scene-overlay { padding: 14px 20px; gap: 14px; }
-  .scene-caption { display: none; }
-  .render-status { padding: 10px 14px; flex-direction: row; align-items: center; gap: 22px; }
-  .render-status dl { gap: 18px; }
+  .scene-overlay { padding: 12px 18px; gap: 10px; }
+  .scene-brand { gap: 8px; }
+  .brand-icon { width: 34px; height: 34px; border-radius: 9px; }
+  .scene-brand h1 { font-size: 19px; }
+  .scene-brand p { font-size: 7px; }
+  .task-badge { padding: 6px 9px; font-size: 9px; }
+  .scene-footer { gap: 6px; }
+  .render-status { padding: 8px 12px; }
 }

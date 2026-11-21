@@ -14,6 +14,7 @@ export type Direction = 'north' | 'east' | 'south' | 'west'
 export type RoadAxis = 'x' | 'z'
 export type DistrictId = 'food-street' | 'old-neighborhood' | 'cbd' | 'civic-center'
 export type BuildingKind = 'shop' | 'apartment' | 'office' | 'civic' | 'hospital' | 'school'
+export type CityView = 'overview' | DistrictId
 
 export interface RoadLane {
   readonly id: string
@@ -130,6 +131,8 @@ export interface CityLayout {
 export interface EngineSnapshot {
   fps: number
   drawCalls: number
+  triangleCount: number
+  instanceCount: number
   viewportWidth: number
   viewportHeight: number
   pixelRatio: number
