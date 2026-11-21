@@ -23,6 +23,7 @@ import { buildTrafficVisuals } from './trafficVisuals'
 import { NavigationSystem } from './navigationSystem'
 import { buildNavigationVisuals } from './navigationVisuals'
 import { OrderManager } from './orderManager'
+import { EventSystem, type EventResolution } from './eventSystem'
 import type { CityView, Direction, EngineSnapshot, NavigationFrameListener, OrderReportReason, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
@@ -60,6 +61,7 @@ export class GameEngine {
   private readonly trafficVisuals: ReturnType<typeof buildTrafficVisuals>
   private readonly navigation = new NavigationSystem(CITY_LAYOUT, RIDER_COLLISION_RADIUS)
   private readonly orders = new OrderManager(CITY_LAYOUT)
+  private readonly eventSystem = new EventSystem()
   private readonly navigationVisuals: ReturnType<typeof buildNavigationVisuals>
   private navigationFrameListener: NavigationFrameListener | null = null
   private navigationElapsed = 0
@@ -244,21 +246,43 @@ export class GameEngine {
   }
 
   acceptOrder(id: string) {
-    if (this.view !== 'ride' || document.hidden || this.shiftEnded || !this.orders.accept(id, this.controller.state)) return false
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded || this.eventSystem.hasActiveEvent || !this.orders.accept(id, this.controller.state)) return false
     this.syncOrderNavigation()
     this.focusCanvas()
     return true
   }
 
   prioritizeOrder(id: string) {
-    if (this.view !== 'ride' || document.hidden || this.shiftEnded || !this.orders.prioritize(id)) return
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded || this.eventSystem.hasActiveEvent || !this.orders.prioritize(id)) return
     this.setNavigationTarget(this.orders.priorityTargetId)
   }
 
   reportOrder(id: string, reason: OrderReportReason) {
-    if (this.view !== 'ride' || document.hidden || this.shiftEnded || !this.orders.report(id, reason)) return false
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded || this.eventSystem.hasActiveEvent || !this.orders.report(id, reason)) return false
     this.lastSnapshotTime = 0
     return true
+  }
+
+  resolveEventChoice(choiceIndex: 0 | 1) {
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded) return
+    const resolution = this.eventSystem.chooseOption(choiceIndex)
+    if (resolution) this.applyEventResolution(resolution)
+    else this.lastSnapshotTime = 0
+  }
+
+  tapEventSprint() {
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded) return
+    const resolution = this.eventSystem.tapSprint()
+    if (resolution) this.applyEventResolution(resolution)
+    else this.lastSnapshotTime = 0
+  }
+
+  private applyEventResolution(resolution: EventResolution) {
+    if (resolution.staminaCost > 0) this.controller.consumeStamina(resolution.staminaCost)
+    this.orders.applyEventResolution(resolution)
+    this.syncOrderNavigation()
+    this.lastSnapshotTime = 0
+    this.focusCanvas()
   }
 
   releaseDrivingKeys() {
@@ -284,6 +308,7 @@ export class GameEngine {
   resetRider() {
     this.controller.reset()
     this.orders.reset()
+    this.eventSystem.reset()
     this.navigation.reset()
     this.syncOrderNavigation()
     this.traffic.reset()
@@ -361,6 +386,7 @@ export class GameEngine {
 
   private readonly onKeyDown = (event: KeyboardEvent) => {
     if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (this.eventSystem.hasActiveEvent) return
     if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, button, a, summary, [contenteditable="true"]')) return
     if (event.code === 'KeyC') {
       event.preventDefault()
@@ -411,9 +437,11 @@ export class GameEngine {
     const deltaSeconds = Math.max(0, Math.min((time - this.previousTime) / 1000, 0.05))
     this.previousTime = time
     const shiftActive = this.view === 'ride' && !document.hidden && !this.shiftEnded
-    if (shiftActive) {
+    const eventBlocking = this.eventSystem.hasActiveEvent
+    if (shiftActive && !eventBlocking) {
       const stepSeconds = Math.min(deltaSeconds, Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed))
       this.shiftElapsed += stepSeconds
+      this.eventSystem.updateRidingCooldown(stepSeconds)
       const previousPosition = { x: this.controller.state.x, z: this.controller.state.z }
       const speedAbs = Math.abs(this.controller.state.speed)
       const isRisky = this.phoneOpen && speedAbs >= DISTRACTION_SAFE_SPEED
@@ -454,7 +482,28 @@ export class GameEngine {
       if (impact) this.controller.applyTrafficImpact(impact.normalX, impact.normalZ, impact.distance, this.distractionLevel)
       this.traffic.checkSignals(previousPosition, state)
       const orderRevision = this.orders.revision
-      this.orders.update(stepSeconds, previousPosition, state, this.traffic.isWaitingAtRedLight(state))
+      const intercepted = this.orders.update(
+        stepSeconds,
+        previousPosition,
+        state,
+        this.traffic.isWaitingAtRedLight(state),
+        (check) => {
+          const triggered = this.eventSystem.tryTriggerArrival(
+            check.phase,
+            check.order.id,
+            check.landmark,
+            check.buildingKind,
+            state.stamina,
+          )
+          if (triggered) {
+            this.clearInput()
+            this.distractionActive = false
+            this.distractionLevel = 0
+            this.lastSnapshotTime = 0
+          }
+          return triggered
+        },
+      )
       if (orderRevision !== this.orders.revision) this.syncOrderNavigation()
       this.navigationElapsed += stepSeconds
       if (this.navigationElapsed >= 0.1) {
@@ -468,14 +517,14 @@ export class GameEngine {
         state,
         state.heading,
         stepSeconds,
-        this.distractionLevel,
+        intercepted ? 0 : this.distractionLevel,
         this.distractionPhaseTime,
         this.reducedMotionQuery?.matches ?? false,
       )
       this.sunlight.target.position.copy(this.rider.root.position)
       this.sunlight.position.copy(this.sunlight.target.position).add({ x: -240, y: 410, z: 220 })
       this.sunlight.shadow.needsUpdate = true
-      if (this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
+      if (!intercepted && this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
         this.shiftElapsed = SHIFT_DURATION_SECONDS
         this.shiftEnded = true
         this.distractionActive = false
@@ -487,6 +536,10 @@ export class GameEngine {
     } else if (this.view === 'ride') {
       this.distractionActive = false
       this.distractionLevel = 0
+      if (shiftActive && eventBlocking) {
+        const sprintResolution = this.eventSystem.updateModal(deltaSeconds)
+        if (sprintResolution) this.applyEventResolution(sprintResolution)
+      }
       this.followCamera.update(this.controller.state, this.controller.state.heading, deltaSeconds, 0, 0, true)
     } else {
       this.distractionActive = false
@@ -511,7 +564,9 @@ export class GameEngine {
       this.sampleFrames = 0
       this.sampleStartedAt = time
     }
-    if (time - this.lastSnapshotTime >= 100) {
+    const eventSnapshot = this.eventSystem.getSnapshot()
+    const snapshotInterval = eventSnapshot.active?.sprint?.active ? 33 : 100
+    if (time - this.lastSnapshotTime >= snapshotInterval) {
       const state = this.controller.state
       let instanceCount = 0
       this.scene.traverse((object) => { if (object instanceof InstancedMesh && object.visible) instanceCount += object.count })
@@ -534,6 +589,7 @@ export class GameEngine {
           elapsedSec: this.distractedElapsedSec,
           warningCount: this.distractionWarningCount,
         },
+        events: eventSnapshot,
         rider: {
           x: state.x, z: state.z, heading: state.heading, speed: state.speed,
           battery: state.battery, stamina: state.stamina, distance: state.distance, braking: state.braking,
@@ -541,7 +597,7 @@ export class GameEngine {
         },
         traffic: this.traffic.getSnapshot(state, this.hornRemaining > 0),
         navigation: this.navigation.snapshot,
-        orders: this.orders.getSnapshot(state, !shiftActive),
+        orders: this.orders.getSnapshot(state, !shiftActive || this.eventSystem.hasActiveEvent),
         fps: this.fps,
         drawCalls: this.renderer.info.render.calls,
         triangleCount: this.renderer.info.render.triangles,

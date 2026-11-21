@@ -99,6 +99,7 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
   const panelId = useId()
   const orders = snapshot?.orders
   const shiftEnded = snapshot?.shift.ended ?? false
+  const eventBlocking = !!snapshot?.events.active
   const elapsed = orders?.elapsedSec ?? 0
   const active = orders?.active ?? []
   const offers = orders?.offers ?? []
@@ -135,7 +136,7 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.isComposing || event.repeat) return
+      if (eventBlocking || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.isComposing || event.repeat) return
       if (event.key === 'Escape' && open) {
         event.preventDefault()
         closePhone()
@@ -156,7 +157,7 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, engine, closePhone, onOpenChange])
+  }, [open, engine, closePhone, onOpenChange, eventBlocking])
 
   function accept(id: string) {
     if (!engine || !orders || orders.paused || full) return

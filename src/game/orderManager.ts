@@ -1,8 +1,16 @@
-import type { CityLandmark, CityLayout, DeliveryOrder, OrderMessage, OrderOffer, OrderReportReason, OrderSnapshot, Point2 } from './types'
+import type { BuildingKind, CityLandmark, CityLayout, DeliveryOrder, OrderMessage, OrderOffer, OrderReportReason, OrderSnapshot, Point2 } from './types'
+import type { EventResolution } from './eventSystem'
 
 export const MAX_ACTIVE_ORDERS = 3
 const OFFER_LIFETIME = 40
 const distance = (a: Point2, b: Point2) => Math.hypot(a.x - b.x, a.z - b.z)
+
+export interface ArrivalCheck {
+  readonly phase: 'pickup' | 'delivery'
+  readonly order: DeliveryOrder
+  readonly landmark: CityLandmark
+  readonly buildingKind: BuildingKind
+}
 
 function entryFraction(from: Point2, to: Point2, point: Point2, radius: number): number | null {
   const ox = from.x - point.x
@@ -25,6 +33,7 @@ export class OrderManager {
   private readonly merchants: readonly CityLandmark[]
   private readonly destinations: readonly CityLandmark[]
   private readonly landmarks: Map<string, CityLandmark>
+  private readonly buildingKinds: Map<string, BuildingKind>
   private readonly spawn: Point2
   private elapsed = 0
   private shiftId = 0
@@ -44,6 +53,7 @@ export class OrderManager {
     this.merchants = layout.landmarks.filter((landmark) => landmark.kind === 'merchant')
     this.destinations = layout.landmarks.filter((landmark) => landmark.kind === 'delivery')
     this.landmarks = new Map(layout.landmarks.map((landmark) => [landmark.id, landmark]))
+    this.buildingKinds = new Map(layout.buildings.map((building) => [building.id, building.kind]))
     this.spawn = layout.spawn.position
     this.reset()
   }
@@ -99,7 +109,7 @@ export class OrderManager {
       acceptedPosition: { x: rider.x, z: rider.z }, deadline: this.elapsed + estimate.idealSec,
       pickedUpAt: null, completedAt: null, actualSec: 0,
       ledger: { ridingSec: 0, trafficWaitSec: 0, merchantDelaySec: 0, lastMileSec: 0, detourSec: 0, idleSec: 0 },
-      settlement: null, reports: [],
+      tipCents: 0, eventPenaltyCents: 0, settlement: null, reports: [],
     })
     this.offers = this.offers.filter((entry) => entry.id !== id)
     this.priorityId ??= id
@@ -119,30 +129,53 @@ export class OrderManager {
     return true
   }
 
-  update(deltaSeconds: number, from: Point2, rider: Point2, waitingAtRed: boolean): void {
+  update(
+    deltaSeconds: number,
+    from: Point2,
+    rider: Point2,
+    waitingAtRed: boolean,
+    onArrivalIntercept?: (check: ArrivalCheck) => boolean,
+  ): boolean {
     const startedAt = this.elapsed
     this.elapsed += deltaSeconds
     const category = distance(from, rider) > 0.0000001 ? 'ridingSec' : waitingAtRed ? 'trafficWaitSec' : 'idleSec'
+    let intercepted = false
     for (const order of this.active) {
       let pickupFraction = 0
-      if (order.status === 'pickup') {
-        const merchant = this.landmarks.get(order.merchantId)!.access
+      if (!intercepted && order.status === 'pickup') {
+        const merchantLandmark = this.landmarks.get(order.merchantId)!
+        const merchant = merchantLandmark.access
         const fraction = entryFraction(from, rider, merchant.position, merchant.radius)
         if (fraction !== null) {
+          const buildingKind = this.buildingKinds.get(merchantLandmark.buildingId) ?? 'shop'
+          if (onArrivalIntercept?.({ phase: 'pickup', order, landmark: merchantLandmark, buildingKind })) {
+            intercepted = true
+            order.ledger[category] += deltaSeconds
+            order.actualSec += deltaSeconds
+            continue
+          }
           pickupFraction = fraction
-          order.status = 'delivery'
-          order.pickedUpAt = startedAt + deltaSeconds * fraction
-          this.notice = `${order.id} 已取餐，送往${this.landmarks.get(order.deliveryId)!.name}。`
-          this.addMessage(order.id, 'merchant', `${this.landmarks.get(order.merchantId)!.name}：餐品已交接，请送往${this.landmarks.get(order.deliveryId)!.name}。`, order.pickedUpAt)
-          this.revision += 1
+          this.completePickupOrder(order, startedAt + deltaSeconds * fraction)
         }
       }
-      const delivery = this.landmarks.get(order.deliveryId)!.access
+      const deliveryLandmark = this.landmarks.get(order.deliveryId)!
+      const delivery = deliveryLandmark.access
       const afterPickup = {
         x: from.x + (rider.x - from.x) * pickupFraction,
         z: from.z + (rider.z - from.z) * pickupFraction,
       }
-      const arrival = order.status === 'delivery' ? entryFraction(afterPickup, rider, delivery.position, delivery.radius) : null
+      const arrival = !intercepted && order.status === 'delivery'
+        ? entryFraction(afterPickup, rider, delivery.position, delivery.radius)
+        : null
+      if (arrival !== null) {
+        const buildingKind = this.buildingKinds.get(deliveryLandmark.buildingId) ?? 'apartment'
+        if (onArrivalIntercept?.({ phase: 'delivery', order, landmark: deliveryLandmark, buildingKind })) {
+          intercepted = true
+          order.ledger[category] += deltaSeconds
+          order.actualSec += deltaSeconds
+          continue
+        }
+      }
       const fraction = arrival === null ? null : pickupFraction + (1 - pickupFraction) * arrival
       const spent = deltaSeconds * (fraction ?? 1)
       order.ledger[category] += spent
@@ -153,22 +186,7 @@ export class OrderManager {
         this.addMessage(order.id, 'customer', '快到配送时限了，麻烦留意送达进度。', reminderAt)
       }
       if (fraction === null) continue
-      const at = startedAt + deltaSeconds * fraction
-      order.status = 'completed'
-      order.completedAt = at
-      const lateSec = Math.max(0, at - order.deadline)
-      const onTime = lateSec <= 0.0000001
-      const bonusCents = onTime ? 150 : 0
-      const penaltyCents = onTime ? 0 : Math.min(order.baseFeeCents, Math.ceil(lateSec - 0.0000001) * 5)
-      order.settlement = {
-        onTime, lateSec: onTime ? 0 : lateSec, baseFeeCents: order.baseFeeCents,
-        bonusCents, penaltyCents, totalCents: order.baseFeeCents + bonusCents - penaltyCents,
-      }
-      this.incomeCents += order.settlement.totalCents
-      this.completed.unshift(order)
-      this.notice = `${order.id} 已送达，${onTime ? '准时奖已入账' : '超时扣款已明细记账'}。`
-      this.addMessage(order.id, 'payment', `配送完成，实得 ¥${(order.settlement.totalCents / 100).toFixed(2)}；${onTime ? '含准时奖 ¥1.50' : `超时扣款 ¥${(penaltyCents / 100).toFixed(2)}`}。`, at)
-      this.revision += 1
+      this.settleOrder(order, startedAt + deltaSeconds * fraction)
     }
     this.active = this.active.filter((order) => order.status !== 'completed')
     if (!this.active.some((order) => order.id === this.priorityId)) {
@@ -180,6 +198,96 @@ export class OrderManager {
       this.nextOfferAt += this.interval()
     }
     this.offers = this.offers.filter((offer) => offer.expiresAt > this.elapsed)
+    return intercepted
+  }
+
+  applyEventResolution(resolution: EventResolution): void {
+    const target = this.active.find((entry) => entry.id === resolution.orderId)
+    if (!target) return
+
+    if (resolution.timeCostSec > 0) {
+      for (const order of this.active) {
+        if (resolution.action === 'transfer-order' && order.id === target.id) continue
+        order.ledger[resolution.ledgerKey] += resolution.timeCostSec
+        order.actualSec += resolution.timeCostSec
+        order.deadline -= resolution.timeCostSec
+        const reminderAt = Math.max(order.acceptedAt, order.deadline - 15)
+        if (!this.reminded.has(order.id) && this.elapsed >= reminderAt) {
+          this.reminded.add(order.id)
+          this.addMessage(order.id, 'customer', '快到配送时限了，麻烦留意送达进度。', this.elapsed)
+        }
+      }
+    }
+
+    this.addMessage(target.id, resolution.messageKind, resolution.messageText, this.elapsed)
+
+    if (resolution.action === 'transfer-order') {
+      this.active = this.active.filter((order) => order.id !== target.id)
+      if (!this.active.some((order) => order.id === this.priorityId)) {
+        this.priorityId = [...this.active].sort((a, b) => a.deadline - b.deadline)[0]?.id ?? null
+      }
+      this.notice = `${target.id} 已报备转单，已释放持单槽位。`
+      this.revision += 1
+      return
+    }
+
+    if (resolution.action === 'complete-pickup') {
+      this.completePickupOrder(target, this.elapsed)
+      return
+    }
+
+    target.tipCents += resolution.tipCents
+    target.eventPenaltyCents += resolution.eventPenaltyCents
+    this.settleOrder(target, this.elapsed)
+    this.active = this.active.filter((order) => order.status !== 'completed')
+    if (!this.active.some((order) => order.id === this.priorityId)) {
+      this.priorityId = [...this.active].sort((a, b) => a.deadline - b.deadline)[0]?.id ?? null
+    }
+  }
+
+  private completePickupOrder(order: DeliveryOrder, at: number): void {
+    order.status = 'delivery'
+    order.pickedUpAt = at
+    this.notice = `${order.id} 已取餐，送往${this.landmarks.get(order.deliveryId)!.name}。`
+    this.addMessage(
+      order.id,
+      'merchant',
+      `${this.landmarks.get(order.merchantId)!.name}：餐品已交接，请送往${this.landmarks.get(order.deliveryId)!.name}。`,
+      at,
+    )
+    this.revision += 1
+  }
+
+  private settleOrder(order: DeliveryOrder, at: number): void {
+    order.status = 'completed'
+    order.completedAt = at
+    const lateSec = Math.max(0, at - order.deadline)
+    const onTime = lateSec <= 0.0000001
+    const bonusCents = onTime ? 150 : 0
+    const penaltyCents = onTime ? 0 : Math.min(order.baseFeeCents, Math.ceil(lateSec - 0.0000001) * 5)
+    const tipCents = order.tipCents
+    const eventPenaltyCents = order.eventPenaltyCents
+    const totalCents = Math.max(0, order.baseFeeCents + bonusCents + tipCents - penaltyCents - eventPenaltyCents)
+    order.settlement = {
+      onTime,
+      lateSec: onTime ? 0 : lateSec,
+      baseFeeCents: order.baseFeeCents,
+      bonusCents,
+      tipCents,
+      penaltyCents,
+      eventPenaltyCents,
+      totalCents,
+    }
+    this.incomeCents += order.settlement.totalCents
+    this.completed.unshift(order)
+    const extras: string[] = []
+    if (onTime) extras.push('含准时奖 ¥1.50')
+    else extras.push(`超时扣款 ¥${(penaltyCents / 100).toFixed(2)}`)
+    if (tipCents > 0) extras.push(`顾客小费 +¥${(tipCents / 100).toFixed(2)}`)
+    if (eventPenaltyCents > 0) extras.push(`异常/差评扣款 −¥${(eventPenaltyCents / 100).toFixed(2)}`)
+    this.notice = `${order.id} 已送达，实得 ¥${(totalCents / 100).toFixed(2)}。`
+    this.addMessage(order.id, 'payment', `配送完成，实得 ¥${(totalCents / 100).toFixed(2)}；${extras.join('，')}。`, at)
+    this.revision += 1
   }
 
   getSnapshot(rider: Point2, paused: boolean): OrderSnapshot {

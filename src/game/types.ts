@@ -240,7 +240,9 @@ export interface OrderSettlement {
   lateSec: number
   baseFeeCents: number
   bonusCents: number
+  tipCents: number
   penaltyCents: number
+  eventPenaltyCents: number
   totalCents: number
 }
 
@@ -263,6 +265,8 @@ export interface DeliveryOrder extends OrderOffer {
   completedAt: number | null
   actualSec: number
   ledger: OrderTimeLedger
+  tipCents: number
+  eventPenaltyCents: number
   settlement: OrderSettlement | null
   reports: { reason: OrderReportReason; at: number }[]
 }
@@ -297,6 +301,70 @@ export interface DistractionSnapshot {
   warningCount: number
 }
 
+export type GameEventKind =
+  | 'merchant-backlog'
+  | 'old-estate-no-ebike'
+  | 'cbd-elevator-jam'
+  | 'wrong-pin-address'
+  | 'locker-full'
+
+export type EventLedgerKey = 'merchantDelaySec' | 'lastMileSec' | 'detourSec'
+
+export interface EventOptionView {
+  readonly id: 'a' | 'b'
+  readonly keyHint: '1' | '2'
+  readonly label: string
+  readonly summary: string
+  readonly tags: readonly string[]
+  readonly tone: 'action' | 'safe' | 'risk'
+}
+
+export interface EventSprintState {
+  readonly active: boolean
+  readonly taps: number
+  readonly targetTaps: number
+  readonly remainingSec: number
+  readonly durationSec: number
+}
+
+export interface ActiveGameEvent {
+  readonly instanceId: number
+  readonly kind: GameEventKind
+  readonly phase: 'pickup' | 'delivery'
+  readonly orderId: string
+  readonly landmarkId: string
+  readonly landmarkName: string
+  readonly badge: string
+  readonly title: string
+  readonly description: string
+  readonly options: readonly [EventOptionView, EventOptionView]
+  readonly sprint: EventSprintState | null
+}
+
+export interface EventOutcome {
+  readonly id: number
+  readonly kind: GameEventKind
+  readonly orderId: string
+  readonly title: string
+  readonly summary: string
+  readonly ledgerKey: EventLedgerKey | null
+  readonly timeCostSec: number
+  readonly staminaDelta: number
+  readonly moneyDeltaCents: number
+  readonly tone: 'good' | 'neutral' | 'warn'
+  readonly remainingSec: number
+}
+
+export interface EventSnapshot {
+  readonly active: ActiveGameEvent | null
+  readonly latestOutcome: EventOutcome | null
+  readonly triggeredCount: number
+  readonly reputation: number
+  readonly goodReviews: number
+  readonly badReviews: number
+  readonly transferredCount: number
+}
+
 export interface EngineSnapshot {
   view: CityView
   cameraMode: RideCameraMode
@@ -304,6 +372,7 @@ export interface EngineSnapshot {
   muted: boolean
   shift: ShiftSnapshot
   distraction: DistractionSnapshot
+  events: EventSnapshot
   rider: RiderSnapshot
   traffic: TrafficSnapshot
   navigation: NavigationSnapshot

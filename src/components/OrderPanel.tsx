@@ -40,6 +40,8 @@ export function CompletedBill({ order }: { order: DeliveryOrder }) {
           <div><dt>基础费</dt><dd>{money(settlement.baseFeeCents)}</dd></div>
           <div><dt>准时奖</dt><dd>+{money(settlement.bonusCents)}</dd></div>
           <div><dt>超时扣款</dt><dd>−{money(settlement.penaltyCents)}</dd></div>
+          {settlement.tipCents > 0 && <div><dt>顾客小费</dt><dd>+{money(settlement.tipCents)}</dd></div>}
+          {settlement.eventPenaltyCents > 0 && <div><dt>异常/差评扣款</dt><dd>−{money(settlement.eventPenaltyCents)}</dd></div>}
           <div><dt>实得</dt><dd><strong>{money(settlement.totalCents)}</strong></dd></div>
         </dl>}
         <details className="order-panel-record">
@@ -73,7 +75,7 @@ export function OrderRules() {
         <li>顺路仅指经新单取送点再到当前优先目标的直线增量不超过 25 米，不保证实际路程或准时。</li>
         <li>消息为本地配送模拟：实际取餐后生成商家交接消息，剩余 15 秒时产生一次顾客提醒；报备不改变计时、计费。</li>
         <li>检查与后台暂停，前台停车仍计时；移动计行驶，正确朝向的红灯停止线前停车计等灯，其余计普通停车。</li>
-        <li>卡餐 / 末端 / 突发尚未接入，保持 0；多单时间独立累加，不可相加为班次时长。</li>
+        <li>卡餐 / 末端 / 突发由取送现场真实交互事件触发并按选择写入对应账本；多单时间独立累加，不可相加为班次时长。</li>
       </ul>
     </details>
   )

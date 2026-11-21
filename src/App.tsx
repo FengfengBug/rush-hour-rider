@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { GameViewport } from './components/GameViewport'
 import { ScaffoldStatus } from './components/ScaffoldStatus'
 import { RiderPhone } from './components/RiderPhone'
+import { EventModal } from './components/EventModal'
 import type { GameEngine } from './game/gameEngine'
 import type { CityView, EngineSnapshot, RideCameraMode, RiderPreviewMode } from './game/types'
 import './App.css'
@@ -94,6 +95,7 @@ export default function App() {
         open={phoneOpen}
         onOpenChange={setPhoneOpen}
       />
+      <EventModal engine={engine} snapshot={snapshot} />
     </main>
   )
 }
