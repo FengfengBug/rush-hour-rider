@@ -2,6 +2,7 @@ import { Bike, Sun } from 'lucide-react'
 import { CITY_LAYOUT } from '../game/cityLayout'
 import { NAVIGATION_COLORS } from '../game/navigationSystem'
 import { MiniMap } from './MiniMap'
+import { OrderPanel } from './OrderPanel'
 import type { GameEngine } from '../game/gameEngine'
 import type { CityView, EngineSnapshot, NavigationKind, RideCameraMode, RiderPreviewMode } from '../game/types'
 
@@ -81,11 +82,11 @@ export function ScaffoldStatus({
             <p>RUSH HOUR RIDER</p>
           </div>
         </div>
-        <span className="task-badge">TASK 2.1 / 光柱与实时导航</span>
+        <span className="task-badge">TASK 2.2 / 订单与真实账本</span>
       </header>
 
       <div className="scene-controls">
-        <section className="navigation-panel" aria-label="自由导航" style={{ borderTopColor: selectedTarget ? NAVIGATION_COLORS[selectedTarget.kind] : undefined }}>
+        <section className="navigation-panel" aria-label="订单导航" style={{ borderTopColor: selectedTarget ? NAVIGATION_COLORS[selectedTarget.kind] : undefined }}>
           <header className="navigation-heading">
             <h2>街区导航</h2>
             {isRiding ? <span>北向全城</span> : <button className="return-ride" type="button" data-view="ride" onClick={() => onViewChange('ride')}>返回骑行</button>}
@@ -107,10 +108,11 @@ export function ScaffoldStatus({
             <strong>{!navigation ? '连接中' : !selectedTarget ? '未选目标' : navigation.arrived ? '已到达目标点' : `${Math.ceil(navigation.distance)} m`}</strong>
             <span>{selectedTarget ? navigation?.arrived ? `${selectedTarget.radius}m 范围内` : '沿路距离' : `${navigation?.targets.length ?? 0} 个地点`}</span>
           </div>
-          <p className="navigation-note">自由导航 · 尚未接单{!isRiding && ' · 已驻车'}</p>
+          <p className="navigation-note">{!isRiding ? '检查中 · 配送与交通暂停' : snapshot?.orders.active.length ? `${snapshot.orders.active.length} 单在途 · 光圈内自动取送` : '接单后显取送点 · 换电仅导航'}</p>
         </section>
 
-        <aside className="inspection-stack" aria-label="驾驶数据与城市检查">
+        <aside className="inspection-stack" aria-label="订单、驾驶数据与城市检查">
+        <OrderPanel orders={snapshot?.orders ?? null} onAccept={(id) => engine?.acceptOrder(id) ?? false} onPrioritize={(id) => engine?.prioritizeOrder(id)} />
         <details className="drive-inspector">
           <summary>驾驶与交通 <small>{speed} km/h · {rider ? `${rider.battery.toFixed(0)}%` : '—'}</small></summary>
         <section className="ride-card" aria-label="实时驾驶数据与操作">
@@ -158,12 +160,12 @@ export function ScaffoldStatus({
               className="reset-rider"
               type="button"
               data-action="reset-rider"
-              title="恢复起点、电量与默认导航；清零里程，重置车流时钟、车辆与安全记录"
-              aria-label="回到起点，恢复电量与默认导航，清零里程，同时重置车流时钟、车辆与安全记录"
+              title="清空本轮订单与账本，重新生成开局单；恢复起点、电量并重置车流、里程与安全记录"
+              aria-label="重新开工，清空本轮订单与账本，恢复起点和电量并重置车流与里程"
               disabled={!snapshot}
               onClick={onResetRider}
             >
-              回到起点
+              重新开工
             </button>
           </div>
 
@@ -228,7 +230,7 @@ export function ScaffoldStatus({
                   ))}
                 </ol>
               ) : <p>{traffic ? '暂无安全事件。' : '安全记录待连接。'}</p>}
-              <p>回到起点会重置骑手与车流、清空安全记录，并恢复默认导航。</p>
+              <p>重新开工会清空本轮订单、收入与账本，并重置骑手、车流及安全记录。</p>
             </div>
           </details>
         </section>
@@ -272,7 +274,7 @@ export function ScaffoldStatus({
                 </button>
               ))}
             </div>
-            <p id="rider-preview-note" className="inspection-note">模型状态仅作原地演示，不是实际驾驶。回到起点会恢复骑手位置与电量、清零里程，重置车流时钟、车辆与安全记录，并恢复默认导航。</p>
+            <p id="rider-preview-note" className="inspection-note">模型演示时暂停配送与交通计时。重新开工会清空本轮订单、收入与账本，恢复骑手位置、电量并重置车流与安全记录。</p>
 
             <section className="render-status" aria-label="实时渲染状态">
               <h3>实时渲染</h3>
@@ -303,7 +305,7 @@ export function ScaffoldStatus({
                 </dl>
                 <p className="city-districts">{CITY_LAYOUT.districts.map((district) => district.name).join(' / ')}</p>
                 <h3>预留交互点坐标 <span>(X, Z) · 米</span></h3>
-                <p className="city-coordinate-note">可自由导航，暂无取送交互；+X 向东、+Z 向南</p>
+                <p className="city-coordinate-note">已接订单在路侧光圈自动取送；+X 向东、+Z 向南</p>
                 <ul className="city-landmarks">
                   {cityPoints.map((point) => (
                     <li key={point.id}>
@@ -323,7 +325,7 @@ export function ScaffoldStatus({
       <footer className="scene-footer">
         <div className="scene-caption">
           <h2><Sun size={14} aria-hidden="true" />看清方向，再出发。</h2>
-          <p>沿道路导航试骑 · 暂无订单</p>
+          <p>三单并送 · 实际耗时入账</p>
         </div>
         <div className="engine-summary">
           <span className="engine-state" data-ready={snapshot !== null}>{snapshot ? '引擎运行中' : '正在初始化'}</span>

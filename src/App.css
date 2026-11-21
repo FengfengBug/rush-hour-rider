@@ -16,6 +16,7 @@
 .drive-inspector, .city-explorer { max-height: 100%; min-height: 36px; overflow: auto; overscroll-behavior: contain; border: 1px solid #d9ddce; border-radius: 10px; background: #fcf8eff5; scrollbar-width: thin; scrollbar-color: #acb29a #fcf8ef; pointer-events: auto; }
 .inspection-stack { display: flex; flex-direction: column; gap: 8px; max-height: 100%; min-height: 0; overflow: hidden; }
 .inspection-stack > details { flex: 0 1 auto; }
+.inspection-stack > details:not([open]) { flex-shrink: 0; }
 .ride-card { padding: 12px; }
 .navigation-panel { min-width: 0; max-height: 100%; overflow: auto; padding: 12px; border: 1px solid #d9ddce; border-top: 3px solid #8ca195; border-radius: 12px; background: #fcf8eff5; pointer-events: auto; scrollbar-width: thin; }
 .navigation-heading { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 20px; margin-bottom: 8px; }
@@ -189,7 +190,7 @@
   .navigation-readout[data-arrived="true"] strong { font-size: 12px; }
   .navigation-readout span { font-size: 9px; }
   .navigation-note { margin-top: 3px; font-size: 9px; line-height: 12px; }
-  .inspection-stack { flex: 0 1 auto; width: min(280px, 100%); min-height: 64px; gap: 4px; }
+  .inspection-stack { flex: 0 1 auto; width: min(280px, 100%); min-height: 104px; gap: 4px; }
   .drive-inspector, .city-explorer { min-height: 30px; }
   .drive-inspector > summary, .city-explorer > summary { padding: 6px 8px; font-size: 10px; }
   .engine-summary { flex-direction: column; align-items: flex-end; gap: 0; padding: 6px 8px; font-size: 9px; }

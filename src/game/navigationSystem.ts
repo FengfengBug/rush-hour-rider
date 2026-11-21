@@ -18,6 +18,7 @@ export class NavigationSystem {
   private readonly walls: Aabb2[]
   private readonly roads: RoadConnection[]
   private readonly edges: { node: number; distance: number }[][]
+  private activeTargets: readonly NavigationTarget[]
   private targetId: string | null = DEFAULT_TARGET
 
   constructor(layout: CityLayout, riderRadius: number) {
@@ -37,6 +38,7 @@ export class NavigationSystem {
         position: station.access.position, radius: station.access.radius, roadId: station.access.roadId,
       })),
     ]
+    this.activeTargets = this.targets
     this.edges = layout.intersections.map(() => [])
     this.roads = layout.roads.map((road) => {
       const nodes = layout.intersections
@@ -53,24 +55,34 @@ export class NavigationSystem {
       }
       return { road, nodes }
     })
-    this.snapshot = { targets: this.targets, targetId: this.targetId, route: [], distance: 0, directDistance: 0, arrived: false }
+    this.snapshot = { targets: this.activeTargets, targetId: this.targetId, route: [], distance: 0, directDistance: 0, arrived: false }
     this.update(layout.spawn.position)
   }
 
+  setActiveTargets(ids: readonly string[]): void {
+    const activeIds = new Set(ids)
+    this.activeTargets = this.targets.filter((target) => activeIds.has(target.id))
+    if (!this.activeTargets.some((target) => target.id === this.targetId)) this.targetId = null
+    this.snapshot = this.targetId === null || !this.activeTargets.some((target) => target.id === this.snapshot.targetId)
+      ? { targets: this.activeTargets, targetId: null, route: [], distance: 0, directDistance: 0, arrived: false }
+      : { ...this.snapshot, targets: this.activeTargets }
+  }
+
   selectTarget(id: string | null): void {
-    if (id !== null && !this.targets.some((target) => target.id === id)) return
+    if (id !== null && !this.activeTargets.some((target) => target.id === id)) return
     this.targetId = id
   }
 
   reset(): void {
+    this.activeTargets = this.targets
     this.targetId = DEFAULT_TARGET
     this.update(this.layout.spawn.position)
   }
 
   update(position: Point2): void {
-    const target = this.targets.find((entry) => entry.id === this.targetId)
+    const target = this.activeTargets.find((entry) => entry.id === this.targetId)
     if (!target) {
-      this.snapshot = { targets: this.targets, targetId: null, route: [], distance: 0, directDistance: 0, arrived: false }
+      this.snapshot = { targets: this.activeTargets, targetId: null, route: [], distance: 0, directDistance: 0, arrived: false }
       return
     }
     const directDistance = distance(position, target.position)
@@ -78,7 +90,7 @@ export class NavigationSystem {
       ? this.simplify([position, target.position])
       : this.findRoute(position, target)
     this.snapshot = {
-      targets: this.targets, targetId: target.id, route,
+      targets: this.activeTargets, targetId: target.id, route,
       distance: route.reduce((sum, point, index) => index === 0 ? 0 : sum + distance(route[index - 1], point), 0),
       directDistance, arrived: directDistance <= target.radius,
     }

@@ -214,6 +214,59 @@ export interface NavigationSnapshot {
 
 export type NavigationFrameListener = (rider: Readonly<RiderSnapshot>, navigation: NavigationSnapshot) => void
 
+export interface OrderTimeLedger {
+  ridingSec: number
+  trafficWaitSec: number
+  merchantDelaySec: number
+  lastMileSec: number
+  detourSec: number
+  idleSec: number
+}
+
+export interface OrderOffer {
+  id: string
+  merchantId: string
+  deliveryId: string
+  offeredAt: number
+  expiresAt: number
+  idealDistance: number
+  idealSec: number
+  baseFeeCents: number
+}
+
+export interface OrderSettlement {
+  onTime: boolean
+  lateSec: number
+  baseFeeCents: number
+  bonusCents: number
+  penaltyCents: number
+  totalCents: number
+}
+
+export interface DeliveryOrder extends OrderOffer {
+  status: 'pickup' | 'delivery' | 'completed'
+  acceptedAt: number
+  acceptedPosition: Point2
+  deadline: number
+  pickedUpAt: number | null
+  completedAt: number | null
+  actualSec: number
+  ledger: OrderTimeLedger
+  settlement: OrderSettlement | null
+}
+
+export interface OrderSnapshot {
+  elapsedSec: number
+  nextOfferInSec: number
+  offers: readonly OrderOffer[]
+  active: readonly DeliveryOrder[]
+  completed: readonly DeliveryOrder[]
+  priorityId: string | null
+  incomeCents: number
+  paused: boolean
+  notice: string
+}
+
 export interface EngineSnapshot {
   view: CityView
   cameraMode: RideCameraMode
@@ -221,6 +274,7 @@ export interface EngineSnapshot {
   rider: RiderSnapshot
   traffic: TrafficSnapshot
   navigation: NavigationSnapshot
+  orders: OrderSnapshot
   fps: number
   drawCalls: number
   triangleCount: number

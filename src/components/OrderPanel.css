@@ -1,0 +1,68 @@
+.order-panel {
+  flex: 0 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-height: 100%;
+  min-height: 36px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #d9ddce;
+  border-radius: 10px;
+  color: #394638;
+  background: #fcf8eff5;
+  font-size: 11px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+  scrollbar-width: thin;
+  scrollbar-color: #acb29a #fcf8ef;
+  pointer-events: auto;
+}
+
+.order-panel, .order-panel * { box-sizing: border-box; }
+.order-panel summary { padding: 7px 0; color: #455640; font-size: 11px; font-weight: 650; line-height: 18px; overflow-wrap: anywhere; cursor: pointer; }
+.order-panel summary::marker { color: #8c793f; }
+.order-panel summary:focus-visible, .order-panel button:focus-visible { outline: 2px solid #3b6756; outline-offset: -3px; border-radius: 7px; }
+.order-panel > summary { position: sticky; top: 0; z-index: 1; min-height: 34px; padding: 8px 10px; background: #fcf8ef; }
+.order-panel > summary > span { display: inline-block; margin-left: 6px; font-weight: 400; }
+.order-panel .order-panel-body { display: grid; gap: 10px; min-width: 0; padding: 4px 10px 10px; }
+.order-panel p { margin: 0; overflow-wrap: anywhere; }
+.order-panel h3, .order-panel h4 { margin: 0; font-size: 12px; line-height: 18px; }
+.order-panel h3 { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+.order-panel h3 > span { color: #64705a; font-size: 11px; font-weight: 400; }
+.order-panel h4 { margin-top: 3px; font-size: 11px; }
+.order-panel .order-panel-notice { padding: 6px 7px; border-radius: 5px; color: #4b6447; background: #eef0e1; }
+.order-panel .order-panel-warning { color: #85521f; }
+.order-panel .order-panel-note { color: #64705a; font-size: 11px; }
+.order-panel .order-panel-route { font-size: 12px; font-weight: 600; }
+.order-panel .order-panel-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.order-panel .order-panel-list > li { min-width: 0; padding: 7px; border: 1px solid #e0e2d4; border-radius: 6px; background: #f8f5e9; }
+.order-panel .order-panel-list > li > p + p { margin-top: 3px; }
+.order-panel .order-panel-list > li[data-priority="true"] { border-color: #b4bd99; background: #f1f1e2; }
+.order-panel .order-panel-list + .order-panel-note { margin-top: 5px; }
+.order-panel .order-panel-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 3px 6px; margin-bottom: 3px; }
+.order-panel .order-panel-row > span { color: #64705a; }
+.order-panel .order-panel-countdown { color: #3d6549; font-weight: 650; }
+.order-panel .order-panel-countdown[data-late="true"] { color: #9a4837; }
+.order-panel button { display: block; width: 100%; min-width: 0; min-height: 30px; margin-top: 6px; padding: 5px 7px; border: 1px solid #cbd1bd; border-radius: 6px; color: #465346; background: #fcf8ef; font-family: inherit; font-size: 11px; line-height: 18px; overflow-wrap: anywhere; cursor: pointer; }
+.order-panel button:hover:not(:disabled) { border-color: #ae8a39; background: #f6ebcd; }
+.order-panel button[aria-pressed="true"] { border-color: #b19349; color: #745518; background: #f7e6af; font-weight: 650; }
+.order-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
+.order-panel .order-panel-completed, .order-panel .order-panel-rules { min-width: 0; border-top: 1px solid #e0e2d4; }
+.order-panel .order-panel-completed > .order-panel-note { margin-bottom: 6px; }
+.order-panel .order-panel-bill > summary { padding: 0; }
+.order-panel .order-panel-bill > summary > span { display: inline-block; margin-left: 6px; }
+.order-panel .order-panel-bill-body { display: grid; gap: 7px; min-width: 0; padding-top: 7px; }
+.order-panel .order-panel-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.order-panel .order-panel-metrics > div, .order-panel .order-panel-record-data > div { min-width: 0; }
+.order-panel dt { color: #64705a; }
+.order-panel dd { margin: 0; overflow-wrap: anywhere; }
+.order-panel .order-panel-metrics dd { font-weight: 600; }
+.order-panel .order-panel-record { border-top: 1px solid #e0e2d4; }
+.order-panel .order-panel-record-data { display: grid; gap: 5px; margin: 0 0 6px; }
+.order-panel .order-panel-rules > ul { display: grid; gap: 5px; margin: 6px 0 0; padding-left: 17px; }
+.order-panel .order-panel-rules li { overflow-wrap: anywhere; }
+
+@media (max-width: 900px), (max-height: 599px) {
+  .order-panel > summary { min-height: 30px; padding: 6px 8px; }
+  .order-panel .order-panel-body { padding: 4px 8px 8px; gap: 8px; }
+}

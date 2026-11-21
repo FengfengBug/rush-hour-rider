@@ -22,6 +22,7 @@ import { TrafficSystem } from './trafficSystem'
 import { buildTrafficVisuals } from './trafficVisuals'
 import { NavigationSystem } from './navigationSystem'
 import { buildNavigationVisuals } from './navigationVisuals'
+import { OrderManager } from './orderManager'
 import type { CityView, Direction, EngineSnapshot, NavigationFrameListener, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
@@ -45,6 +46,7 @@ export class GameEngine {
   private readonly traffic = new TrafficSystem(CITY_LAYOUT, (event) => console.info('交通事件', event))
   private readonly trafficVisuals: ReturnType<typeof buildTrafficVisuals>
   private readonly navigation = new NavigationSystem(CITY_LAYOUT, RIDER_COLLISION_RADIUS)
+  private readonly orders = new OrderManager(CITY_LAYOUT)
   private readonly navigationVisuals: ReturnType<typeof buildNavigationVisuals>
   private navigationFrameListener: NavigationFrameListener | null = null
   private navigationElapsed = 0
@@ -98,6 +100,7 @@ export class GameEngine {
     this.rider = buildRiderVehicle()
     this.trafficVisuals = buildTrafficVisuals(CITY_LAYOUT, this.traffic.signals, this.traffic.vehicles)
     this.navigationVisuals = buildNavigationVisuals(this.navigation.targets)
+    this.syncOrderNavigation()
     this.scene.add(this.rider.root, this.dust.root, this.trafficVisuals.root, this.navigationVisuals.root)
     this.updateRider()
 
@@ -189,10 +192,34 @@ export class GameEngine {
 
   setNavigationTarget(id: string | null) {
     this.navigation.selectTarget(id)
+    if (id !== null && id !== this.orders.priorityTargetId) this.orders.prioritizeTarget(id)
     this.navigation.update(this.controller.state)
     this.navigationElapsed = 0
     this.lastSnapshotTime = 0
     this.focusCanvas()
+  }
+
+  acceptOrder(id: string) {
+    if (this.view !== 'ride' || document.hidden || !this.orders.accept(id, this.controller.state)) return false
+    this.syncOrderNavigation()
+    this.focusCanvas()
+    return true
+  }
+
+  prioritizeOrder(id: string) {
+    if (!this.orders.prioritize(id)) return
+    this.setNavigationTarget(this.orders.priorityTargetId)
+  }
+
+  private syncOrderNavigation() {
+    this.navigation.setActiveTargets([
+      ...this.orders.activeTargetIds,
+      ...CITY_LAYOUT.batteryStations.map((station) => station.id),
+    ])
+    this.navigation.selectTarget(this.orders.priorityTargetId)
+    this.navigation.update(this.controller.state)
+    this.navigationElapsed = 0
+    this.lastSnapshotTime = 0
   }
 
   setNavigationFrameListener(listener: NavigationFrameListener | null) {
@@ -202,8 +229,9 @@ export class GameEngine {
 
   resetRider() {
     this.controller.reset()
+    this.orders.reset()
     this.navigation.reset()
-    this.navigationElapsed = 0
+    this.syncOrderNavigation()
     this.traffic.reset()
     this.trafficVisuals.update(0)
     this.collisionDisplayTime = 0
@@ -265,6 +293,8 @@ export class GameEngine {
 
   private readonly onVisibilityChange = () => {
     if (document.hidden) this.clearInput()
+    this.previousTime = performance.now()
+    this.lastSnapshotTime = 0
   }
 
   private readonly onKeyDown = (event: KeyboardEvent) => {
@@ -318,7 +348,7 @@ export class GameEngine {
   private readonly tick = (time: number) => {
     const deltaSeconds = Math.max(0, Math.min((time - this.previousTime) / 1000, 0.05))
     this.previousTime = time
-    if (this.view === 'ride') {
+    if (this.view === 'ride' && !document.hidden) {
       const previousPosition = { x: this.controller.state.x, z: this.controller.state.z }
       this.traffic.update(deltaSeconds, this.controller.state)
       this.hornRemaining = Math.max(0, this.hornRemaining - deltaSeconds)
@@ -335,6 +365,9 @@ export class GameEngine {
       const impact = this.traffic.checkCollision(state)
       if (impact) this.controller.applyTrafficImpact(impact.normalX, impact.normalZ, impact.distance)
       this.traffic.checkSignals(previousPosition, state)
+      const orderRevision = this.orders.revision
+      this.orders.update(deltaSeconds, previousPosition, state, this.traffic.isWaitingAtRedLight(state))
+      if (orderRevision !== this.orders.revision) this.syncOrderNavigation()
       this.navigationElapsed += deltaSeconds
       if (this.navigationElapsed >= 0.1) {
         this.navigation.update(state)
@@ -383,6 +416,7 @@ export class GameEngine {
         },
         traffic: this.traffic.getSnapshot(state, this.hornRemaining > 0),
         navigation: this.navigation.snapshot,
+        orders: this.orders.getSnapshot(state, this.view !== 'ride' || document.hidden),
         fps: this.fps,
         drawCalls: this.renderer.info.render.calls,
         triangleCount: this.renderer.info.render.triangles,

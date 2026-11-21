@@ -260,6 +260,24 @@ export class TrafficSystem {
     return impact
   }
 
+  isWaitingAtRedLight(rider: RiderSnapshot): boolean {
+    if (Math.abs(rider.speed) > 0.25) return false
+    const x = Math.sin(rider.heading)
+    const z = Math.cos(rider.heading)
+    const axis = Math.abs(x) > Math.abs(z) ? 'x' : 'z'
+    const forward = axis === 'x' ? x : z
+    if (Math.abs(forward) < 0.9) return false
+    const direction = Math.sign(forward)
+    const lateral = axis === 'x' ? 'z' : 'x'
+    return this.signals.some((signal) => {
+      if ((axis === 'x' ? signal.phaseX : signal.phaseZ) !== 'red') return false
+      const lane = (rider[lateral] - signal[lateral]) * direction * (axis === 'x' ? 1 : -1)
+      const stopDistance = (signal[axis] - rider[axis]) * direction - TRAFFIC_STOP_DISTANCE - RIDER_TRAFFIC_RADIUS
+      return lane >= 0.5 && lane <= this.layout.roadWidth / 2 - RIDER_TRAFFIC_RADIUS
+        && stopDistance >= 0 && stopDistance <= 5
+    })
+  }
+
   getSnapshot(rider: RiderSnapshot, hornActive: boolean): TrafficSnapshot {
     const heading = rider.heading + (rider.speed < 0 ? Math.PI : 0)
     const axis = Math.abs(Math.sin(heading)) > Math.abs(Math.cos(heading)) ? 'x' : 'z'

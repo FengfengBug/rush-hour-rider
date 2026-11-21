@@ -96,18 +96,12 @@ export function buildNavigationVisuals(targets: readonly NavigationTarget[]): {
   }
   const markerCounts: Record<NavigationKind, number> = { pickup: 0, delivery: 0, battery: 0 }
   const highlight = new Color('#fff5df')
-  const visuals = targets.map((target, index) => {
+  const visuals = targets.map((target) => {
     const color = new Color(NAVIGATION_COLORS[target.kind])
     const markerIndex = markerCounts[target.kind]
     markerCounts[target.kind] += 2
-    transform.position.set(target.position.x, GROUND_Y + 0.035, target.position.z)
-    transform.rotation.set(0, 0, 0)
-    transform.scale.set(target.radius, 1, target.radius)
-    transform.updateMatrix()
-    rings.setMatrixAt(index, transform.matrix)
     return { target, color, selectedColor: color.clone().lerp(highlight, 0.32), markerIndex, markerMesh: markerMeshes[target.kind] }
   })
-  rings.instanceMatrix.needsUpdate = true
 
   const canvas = document.createElement('canvas')
   canvas.width = 512
@@ -163,11 +157,18 @@ export function buildNavigationVisuals(targets: readonly NavigationTarget[]): {
   let previousSelection = -2
   let disposed = false
 
-  function updateLandmarks(selectedIndex: number, rider?: Readonly<RiderSnapshot>): void {
+  function updateLandmarks(selectedIndex: number, activeTargets: readonly NavigationTarget[], rider?: Readonly<RiderSnapshot>): void {
     const selectionChanged = selectedIndex !== previousSelection
     for (let index = 0; index < visuals.length; index += 1) {
       const visual = visuals[index]
       const { target, markerMesh, markerIndex } = visual
+      const active = activeTargets.some((entry) => entry.id === target.id)
+      transform.position.set(target.position.x, GROUND_Y + 0.035, target.position.z)
+      transform.rotation.set(0, 0, 0)
+      transform.scale.set(target.radius, 1, target.radius)
+      if (!active) transform.scale.setScalar(0)
+      transform.updateMatrix()
+      rings.setMatrixAt(index, transform.matrix)
       const selected = index === selectedIndex
       const height = selected ? 50 : 44
       const phase = index * 0.79
@@ -176,6 +177,7 @@ export function buildNavigationVisuals(targets: readonly NavigationTarget[]): {
       transform.position.set(target.position.x, GROUND_Y + height / 2, target.position.z)
       transform.rotation.set(0, elapsed * 0.2 + phase, 0)
       transform.scale.set(radius, height, radius)
+      if (!active) transform.scale.setScalar(0)
       transform.updateMatrix()
       columns.setMatrixAt(index, transform.matrix)
       const distance = rider ? Math.hypot(rider.x - target.position.x, rider.z - target.position.z) : 24
@@ -185,10 +187,12 @@ export function buildNavigationVisuals(targets: readonly NavigationTarget[]): {
       transform.rotation.y = elapsed * 0.32 + phase
       transform.position.y = 5.4 + bob
       transform.scale.setScalar(selected ? 1.2 : 1)
+      if (!active) transform.scale.setScalar(0)
       transform.updateMatrix()
       markerMesh.setMatrixAt(markerIndex, transform.matrix)
       transform.position.y = GROUND_Y + height + 0.7 + bob
       transform.scale.setScalar(selected ? 2.5 : 2.1)
+      if (!active) transform.scale.setScalar(0)
       transform.updateMatrix()
       markerMesh.setMatrixAt(markerIndex + 1, transform.matrix)
       if (selectionChanged) {
@@ -200,8 +204,7 @@ export function buildNavigationVisuals(targets: readonly NavigationTarget[]): {
       }
     }
     columnOpacity.needsUpdate = true
-    columns.instanceMatrix.needsUpdate = true
-    for (const kind of KINDS) markerMeshes[kind].instanceMatrix.needsUpdate = true
+    for (const mesh of meshes) mesh.instanceMatrix.needsUpdate = true
     if (selectionChanged) {
       for (const mesh of meshes) {
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
@@ -238,9 +241,10 @@ export function buildNavigationVisuals(targets: readonly NavigationTarget[]): {
     if (disposed) return
     const dt = Number.isFinite(deltaSeconds) ? Math.max(0, deltaSeconds) : 0
     elapsed += dt
-    const selectedIndex = navigation.targetId === null ? -1 : targets.findIndex((target) => target.id === navigation.targetId)
+    const selectedIndex = navigation.targets.some((target) => target.id === navigation.targetId)
+      ? targets.findIndex((target) => target.id === navigation.targetId) : -1
     const target = selectedIndex < 0 ? null : targets[selectedIndex]
-    updateLandmarks(selectedIndex, rider)
+    updateLandmarks(selectedIndex, navigation.targets, rider)
     label.visible = target !== null && context !== null
     if (target) {
       updateLabel(target, navigation.arrived)
@@ -296,7 +300,7 @@ export function buildNavigationVisuals(targets: readonly NavigationTarget[]): {
     labelTexture.dispose()
   }
 
-  updateLandmarks(-1)
+  updateLandmarks(-1, targets)
   for (const mesh of meshes) if (mesh.instanceColor) mesh.instanceColor.setUsage(DynamicDrawUsage)
   return { root, update, dispose }
 }
