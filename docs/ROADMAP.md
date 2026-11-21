@@ -59,7 +59,7 @@
 | 阶段 | 日期 | 任务 ID | 任务名称 | 状态 |
 | --- | --- | --- | --- | --- |
 | Stage 0 | Day 1 (11/21) | Task 0.1 | 工程脚手架、目录结构与 GitHub 仓库绑定 | 已完成 |
-| Stage 0 | Day 1 (11/21) | Task 0.2 | Three.js 渲染宿主与最小 3D 光照场景 | 待办 |
+| Stage 0 | Day 1 (11/21) | Task 0.2 | Three.js 渲染宿主与最小 3D 光照场景 | 已完成 |
 | Stage 1 | Day 1 (11/21) | Task 1.1 | 4×4 微缩中国街区地图数据与 2D AABB 碰撞盒 | 待办 |
 | Stage 1 | Day 1 (11/21) | Task 1.2 | Low-Poly 城市街景、中式动态招牌与合批渲染 | 待办 |
 | Stage 1 | Day 2 (11/22) | Task 1.3 | Low-Poly 骑手与电动车程序化建模 | 待办 |
@@ -101,13 +101,14 @@
 - **建议截图**：Qoder 终端 `npm run build` 成功界面 + 工程目录树。
 
 #### Task 0.2 Three.js 渲染宿主与最小 3D 光照场景
-- **状态**：待办
+- **状态**：已完成（2026-11-21）
+- **完成说明**：独立渲染宿主、暖色日光与阴影、旋转方块及约 10Hz 渲染快照已接入；构建与独立 Chrome 的多尺寸/DPR 上限/StrictMode 单画布/三轮资源销毁验证通过，用户确认的开发与实机同屏截图已归档并写入 `DEVLOG.md`。
 - **目标**：创建独立的 `GameEngine` 渲染宿主与 React 挂载容器，渲染出温暖日光感的天空、方向光+阴影、基础地面与一个旋转参考方块，验证窗口 resize、资源销毁（React StrictMode 不重复创建双画布）与 60fps 循环。
 - **核心改动**：`src/game/gameEngine.ts`、`src/game/types.ts`、`src/App.tsx`、`src/App.css`。
 - **验收标准**：
-  - [ ] 浏览器全屏显示柔和暖色调 Low-Poly 天空与带阴影的地面，无滚动条溢出。
-  - [ ] 缩放窗口时画布比例与清晰度自适应，`devicePixelRatio` 上限限制为 2 防高分屏卡顿。
-  - [ ] React StrictMode 下无双 Canvas、无控制台报错，`npm run build` 通过。
+  - [x] 浏览器全屏显示柔和暖色调 Low-Poly 天空与带阴影的地面，无滚动条溢出。
+  - [x] 缩放窗口时画布比例与清晰度自适应，`devicePixelRatio` 上限限制为 2 防高分屏卡顿。
+  - [x] React StrictMode 下无双 Canvas、无控制台报错，`npm run build` 通过。
 - **禁止事项**：不把 `requestAnimationFrame` 逻辑写进 React `useState` 逐帧刷新。
 - **建议截图**：浏览器 3D 光照画布运行图 + Qoder 代码编辑截图。
 

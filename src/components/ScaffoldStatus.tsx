@@ -1,37 +1,41 @@
-import { useState, version as reactVersion } from 'react'
-import { ArrowRight, CheckCircle2, Terminal } from 'lucide-react'
-import { REVISION } from 'three'
+import { Bike, Sun } from 'lucide-react'
+import type { EngineSnapshot } from '../game/types'
 
-export function ScaffoldStatus() {
-  const [interactionCount, setInteractionCount] = useState(0)
+interface ScaffoldStatusProps {
+  snapshot: EngineSnapshot | null
+}
 
+export function ScaffoldStatus({ snapshot }: ScaffoldStatusProps) {
   return (
-    <section className="status-panel" aria-labelledby="status-title">
-      <div className="status-heading">
-        <span className="status-icon"><Terminal size={22} aria-hidden="true" /></span>
-        <div>
-          <p className="eyebrow">WORKSPACE / READY</p>
-          <h2 id="status-title">工程已启动</h2>
+    <div className="scene-overlay">
+      <header className="scene-header">
+        <div className="scene-brand">
+          <span className="brand-icon"><Bike size={25} aria-hidden="true" /></span>
+          <div>
+            <h1>午高峰</h1>
+            <p>RUSH HOUR RIDER</p>
+          </div>
         </div>
-        <span className="running-indicator">运行中</span>
-      </div>
+        <span className="task-badge">TASK 0.2 / 渲染底座</span>
+      </header>
 
-      <dl className="runtime-grid">
-        <div><dt>界面运行时</dt><dd>React {reactVersion}</dd></div>
-        <div><dt>原生 3D 依赖</dt><dd>Three.js r{REVISION}</dd></div>
-        <div><dt>运行环境</dt><dd>{import.meta.env.PROD ? '生产预览' : '本地开发'}</dd></div>
-      </dl>
+      <footer className="scene-footer">
+        <div className="scene-caption">
+          <span className="scene-eyebrow"><Sun size={16} aria-hidden="true" />日光与实时阴影</span>
+          <h2>第一束光，已经照进来了。</h2>
+          <p>旋转参考方块 · 原生 Three.js · 尚未接入街区与骑行</p>
+        </div>
 
-      <div className="interaction-check">
-        <p role="status" aria-live="polite">
-          {interactionCount > 0 ? (
-            <><CheckCircle2 size={18} aria-hidden="true" />交互检查通过 · 已响应 {interactionCount} 次</>
-          ) : '点击右侧按钮，验证 React 事件与状态更新。'}
-        </p>
-        <button type="button" onClick={() => setInteractionCount((count) => count + 1)}>
-          验证页面交互<ArrowRight size={17} aria-hidden="true" />
-        </button>
-      </div>
-    </section>
+        <section className="render-status" aria-label="实时渲染状态">
+          <span className="engine-state">{snapshot ? '引擎运行中' : '正在初始化'}</span>
+          <dl>
+            <div><dt>实测帧率</dt><dd>{snapshot && snapshot.fps > 0 ? `${snapshot.fps} FPS` : '采样中'}</dd></div>
+            <div><dt>绘制调用</dt><dd>{snapshot?.drawCalls ?? '—'}</dd></div>
+            <div><dt>视口</dt><dd>{snapshot ? `${snapshot.viewportWidth} × ${snapshot.viewportHeight}` : '—'}</dd></div>
+            <div><dt>像素比</dt><dd>{snapshot ? `${snapshot.pixelRatio.toFixed(2)}×` : '—'}</dd></div>
+          </dl>
+        </section>
+      </footer>
+    </div>
   )
 }

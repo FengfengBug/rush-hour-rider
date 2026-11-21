@@ -1,0 +1,50 @@
+.game-shell { position: relative; width: 100%; height: 100%; isolation: isolate; }
+.game-viewport { position: absolute; inset: 0; }
+.game-viewport canvas { display: block; width: 100%; height: 100%; }
+.scene-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 30px 36px; pointer-events: none; }
+.scene-header, .scene-brand, .scene-footer, .scene-eyebrow, .render-status, .render-status dl { display: flex; align-items: center; }
+.scene-header { justify-content: space-between; gap: 20px; }
+.scene-brand { gap: 12px; }
+.brand-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; background: #f4be41; }
+.scene-brand h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.05em; }
+.scene-brand p { margin: 3px 0 0; font-size: 9px; font-weight: 650; letter-spacing: 0.15em; }
+.task-badge { padding: 9px 12px; border: 1px solid #6a765731; border-radius: 6px; color: #58604e; background: #f7f8eea8; font-size: 11px; letter-spacing: 0.05em; }
+
+.scene-footer { align-items: flex-end; justify-content: space-between; gap: 22px; }
+.scene-eyebrow { gap: 7px; font-size: 11px; letter-spacing: 0.1em; color: #59644d; }
+.scene-caption h2 { margin: 12px 0 9px; font-size: clamp(19px, 2.1vw, 27px); font-weight: 650; letter-spacing: -0.03em; }
+.scene-caption p { margin: 0; color: #5e6852; font-size: 11px; line-height: 1.7; }
+.render-status { flex-direction: column; align-items: stretch; flex-shrink: 0; gap: 14px; padding: 17px 20px; border: 1px solid #fdfef197; border-radius: 12px; background: #f8f9eedb; }
+.engine-state { font-size: 11px; color: #42653a; }
+.engine-state::before { display: inline-block; content: ""; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: #578249; }
+.render-status dl { margin: 0; gap: 24px; }
+.render-status dt { font-size: 10px; color: #6b745d; }
+.render-status dd { margin: 7px 0 0; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .scene-overlay { padding: 22px; }
+  .scene-footer { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .render-status { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
+  .render-status dl { gap: 22px; }
+}
+
+@media (max-width: 480px) {
+  .scene-overlay { padding: 16px; }
+  .scene-brand { gap: 8px; }
+  .brand-icon { width: 37px; height: 37px; border-radius: 10px; }
+  .scene-brand h1 { font-size: 21px; }
+  .scene-brand p { font-size: 7px; }
+  .task-badge { padding: 7px 8px; font-size: 9px; }
+  .scene-caption h2 { font-size: 20px; }
+  .scene-caption p { font-size: 10px; }
+  .render-status { padding: 13px; flex-direction: column; align-items: stretch; gap: 12px; }
+  .render-status dl { justify-content: space-between; gap: 8px; }
+  .render-status dd { font-size: 12px; }
+}
+
+@media (max-height: 440px) {
+  .scene-overlay { padding: 14px 20px; }
+  .scene-caption { display: none; }
+  .render-status { padding: 10px 14px; flex-direction: row; align-items: center; gap: 22px; }
+  .render-status dl { gap: 18px; }
+}
