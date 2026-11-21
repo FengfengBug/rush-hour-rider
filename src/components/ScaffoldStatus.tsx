@@ -46,6 +46,10 @@ export function ScaffoldStatus({
   const cameraMode = snapshot?.cameraMode ?? 'near'
   const riderPreview = snapshot?.riderPreview ?? 'parked'
   const rider = snapshot?.rider
+  const traffic = snapshot?.traffic
+  const nearbySignal = traffic?.nearbySignal
+  const recentEvents = traffic?.events.slice(0, 3)
+  const signalLabels = { red: '红灯', yellow: '黄灯', green: '绿灯' }
   const isRiding = view === 'ride'
   const speed = rider ? `${rider.speed > 0 ? '+' : ''}${(rider.speed * 3.6).toFixed(1)}` : '—'
   const direction = rider ? rider.speed < 0 ? '倒车' : rider.speed > 0 ? '前进' : '静止' : '待连接'
@@ -66,7 +70,7 @@ export function ScaffoldStatus({
             <p>RUSH HOUR RIDER</p>
           </div>
         </div>
-        <span className="task-badge">TASK 1.4 / 驾驶与安全测试</span>
+        <span className="task-badge">TASK 1.5 / 车流与交通安全</span>
       </header>
 
       <div className="scene-controls">
@@ -94,17 +98,6 @@ export function ScaffoldStatus({
             </div>
           </dl>
 
-          <dl className="ride-telemetry">
-            <div><dt>累计里程</dt><dd>{rider ? `${rider.distance.toFixed(1)} m` : '—'}</dd></div>
-            <div><dt>位置 (X, Z) · 米</dt><dd>{rider ? `(${rider.x.toFixed(1)}, ${rider.z.toFixed(1)})` : '—'}</dd></div>
-          </dl>
-
-          <div className="drive-status" role="group" aria-label="车辆状态">
-            <span data-active={rider?.boosting ?? false}>{rider ? rider.boosting ? '助推中' : '助推待机' : '助推 —'}</span>
-            <span data-active={rider?.braking ?? false}>{rider ? rider.braking ? '制动中' : '未刹车' : '刹车 —'}</span>
-            <span className="contact-status" data-active={rider?.colliding ?? false}>{rider ? rider.colliding ? '墙体接触' : '无墙体接触' : '墙体 —'}</span>
-          </div>
-
           <div className="ride-actions">
             <div className="ride-cameras" role="group" aria-label="骑行镜头">
               {cameraModes.map((option) => (
@@ -126,13 +119,48 @@ export function ScaffoldStatus({
               className="reset-rider"
               type="button"
               data-action="reset-rider"
-              title="恢复起点与电量，清零里程"
-              aria-label="回到起点，恢复电量并清零里程"
+              title="恢复起点与电量，清零里程；重置车流时钟、车辆与安全记录"
+              aria-label="回到起点，恢复电量并清零里程，同时重置车流时钟、车辆与安全记录"
               disabled={!snapshot}
               onClick={onResetRider}
             >
               回到起点
             </button>
+          </div>
+
+          <section className="traffic-status" aria-label="实时车流与交通安全">
+            <h3>街区车流 <small>{traffic ? `${traffic.vehicleCount} 辆 · ${isRiding ? '运行中' : '已冻结'}` : '待连接'}</small></h3>
+            <dl className="traffic-counts">
+              <div><dt>行驶</dt><dd>{traffic ? traffic.vehicleCount - traffic.queuedCount : '—'}</dd></div>
+              <div><dt>排队</dt><dd>{traffic?.queuedCount ?? '—'}</dd></div>
+              <div><dt>闯红灯</dt><dd>{traffic?.redLightCount ?? '—'}</dd></div>
+              <div><dt>碰撞</dt><dd>{traffic?.collisionCount ?? '—'}</dd></div>
+            </dl>
+            <div className="nearby-signal">
+              {nearbySignal ? (
+                <>
+                  <p>最近接近路口 · {nearbySignal.axis === 'x' ? '东西' : '南北'}向 · {nearbySignal.distance.toFixed(0)} m</p>
+                  <div className="signal-readout">
+                    <span className="signal-phase" data-phase={nearbySignal.phase}>
+                      {signalLabels[nearbySignal.phase]} · 剩余 {Math.ceil(Math.max(0, nearbySignal.remaining))} s
+                    </span>
+                    <span className="signal-id">{nearbySignal.intersectionId}</span>
+                  </div>
+                </>
+              ) : <p>{traffic ? '附近暂无接近路口信号' : '路口信号待连接'}</p>}
+            </div>
+          </section>
+
+          <dl className="ride-telemetry">
+            <div><dt>累计里程</dt><dd>{rider ? `${rider.distance.toFixed(1)} m` : '—'}</dd></div>
+            <div><dt>位置 (X, Z) · 米</dt><dd>{rider ? `(${rider.x.toFixed(1)}, ${rider.z.toFixed(1)})` : '—'}</dd></div>
+          </dl>
+
+          <div className="drive-status" role="group" aria-label="车辆状态">
+            <span data-active={rider?.boosting ?? false}>{rider ? rider.boosting ? '助推中' : '助推待机' : '助推 —'}</span>
+            <span data-active={rider?.braking ?? false}>{rider ? rider.braking ? '制动中' : '未刹车' : '刹车 —'}</span>
+            <span className="contact-status" data-active={rider?.colliding ?? false}>{rider ? rider.colliding ? '碰撞接触' : '无碰撞接触' : '碰撞 —'}</span>
+            <span data-active={traffic?.hornActive ?? false} role="status">{traffic ? traffic.hornActive ? '鸣笛波纹中' : '鸣笛待机' : '鸣笛 —'}</span>
           </div>
 
           <div className="ride-hints">
@@ -141,16 +169,36 @@ export function ScaffoldStatus({
               <span><kbd>Space</kbd> 急刹</span>
               <span><kbd>Shift</kbd> 耗电助推</span>
               <span><kbd>C</kbd> 切镜头</span>
+              <span><kbd>H</kbd> 鸣笛（波纹）</span>
             </p>
+            <p className="horn-note">鸣笛仅显示波纹，暂无声音。</p>
             <p className="desktop-hint">需实体键盘，建议使用电脑体验。</p>
           </div>
+
+          <details className="safety-record">
+            <summary>安全记录 <small>最近 {recentEvents?.length ?? '—'} 条</small></summary>
+            <div className="safety-record-body">
+              <p>交通时钟 {traffic ? `${traffic.elapsedSeconds.toFixed(1)} s` : '—'}{!isRiding && ' · 已冻结'}</p>
+              {recentEvents && recentEvents.length > 0 ? (
+                <ol>
+                  {recentEvents.map((event) => (
+                    <li key={event.id}>
+                      <div><strong>{event.type === 'red-light' ? '闯红灯' : '交通碰撞'}</strong><span>{event.time.toFixed(1)} s</span></div>
+                      <p>位置 (X, Z) · ({event.position.x.toFixed(1)}, {event.position.z.toFixed(1)}) m</p>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p>{traffic ? '暂无安全事件。' : '安全记录待连接。'}</p>}
+              <p>回到起点会重置骑手、车流时钟与车辆，并清空安全记录。</p>
+            </div>
+          </details>
         </section>
 
         <details className="city-explorer">
           <summary>城市与模型检查 <small>{cityViews.length} 个视角 · 渲染 / 地图数据</small></summary>
           <div className="city-explorer-body">
             <div className="city-explorer-intro">
-              <p>检查时停车并停用驾驶输入；返回骑行保留位置。</p>
+              <p>检查时冻结骑手、车流与交通时钟，并停用驾驶输入；返回骑行从原处继续。</p>
               <p>拖动旋转 · 滚轮缩放 · 右键平移</p>
             </div>
             <nav className="city-views" aria-label="检查视角">
@@ -184,7 +232,7 @@ export function ScaffoldStatus({
                 </button>
               ))}
             </div>
-            <p id="rider-preview-note" className="inspection-note">模型状态仅作原地演示，不是实际驾驶。回到起点会恢复电量并清零里程。</p>
+            <p id="rider-preview-note" className="inspection-note">模型状态仅作原地演示，不是实际驾驶。回到起点会恢复骑手位置与电量、清零里程，重置车流时钟、车辆并清空安全记录。</p>
 
             <section className="render-status" aria-label="实时渲染状态">
               <h3>实时渲染</h3>
@@ -210,7 +258,7 @@ export function ScaffoldStatus({
                   <div><dt>路口</dt><dd>{CITY_LAYOUT.intersections.length}</dd></div>
                   <div><dt>人行道段</dt><dd>{CITY_LAYOUT.sidewalks.length}</dd></div>
                   <div><dt>建筑 / 碰撞盒</dt><dd>{CITY_LAYOUT.buildings.length} / {CITY_LAYOUT.colliders.length}</dd></div>
-                  <div><dt>巡航线（仅数据）</dt><dd>{CITY_LAYOUT.trafficRoutes.length}</dd></div>
+                  <div><dt>巡航路线</dt><dd>{CITY_LAYOUT.trafficRoutes.length}</dd></div>
                   <div><dt>功能区</dt><dd>{CITY_LAYOUT.districts.length}</dd></div>
                 </dl>
                 <p className="city-districts">{CITY_LAYOUT.districts.map((district) => district.name).join(' / ')}</p>
@@ -234,7 +282,7 @@ export function ScaffoldStatus({
       <footer className="scene-footer">
         <div className="scene-caption">
           <h2><Sun size={14} aria-hidden="true" />先练稳，再出发。</h2>
-          <p>驾驶与安全测试 · 暂无订单与车流</p>
+          <p>车流与交通安全 · 暂无订单</p>
         </div>
         <div className="engine-summary">
           <span className="engine-state" data-ready={snapshot !== null}>{snapshot ? '引擎运行中' : '正在初始化'}</span>

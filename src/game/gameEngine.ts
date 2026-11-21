@@ -18,6 +18,8 @@ import { buildRiderVehicle, RIDER_WHEEL_RADIUS } from './riderVehicle'
 import { RiderController } from './riderController'
 import { FollowCamera } from './followCamera'
 import { buildBrakeDust } from './brakeDust'
+import { TrafficSystem } from './trafficSystem'
+import { buildTrafficVisuals } from './trafficVisuals'
 import type { CityView, Direction, EngineSnapshot, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
@@ -38,6 +40,9 @@ export class GameEngine {
   private readonly followCamera = new FollowCamera(CITY_LAYOUT.buildings)
   private readonly controller = new RiderController(CITY_LAYOUT)
   private readonly dust = buildBrakeDust()
+  private readonly traffic = new TrafficSystem(CITY_LAYOUT, (event) => console.info('交通事件', event))
+  private readonly trafficVisuals: ReturnType<typeof buildTrafficVisuals>
+  private hornRemaining = 0
   private readonly keys = new Set<string>()
   private readonly renderer: WebGLRenderer
   private readonly controls: OrbitControls
@@ -70,7 +75,7 @@ export class GameEngine {
     this.renderer.shadowMap.type = PCFShadowMap
     this.renderer.domElement.tabIndex = 0
     this.renderer.domElement.setAttribute('role', 'img')
-    this.renderer.domElement.setAttribute('aria-label', '外卖骑手驾驶场景，WASD或方向键骑行，空格急刹，Shift冲刺，C切换跟随视角')
+    this.renderer.domElement.setAttribute('aria-label', '外卖骑手驾驶场景，WASD或方向键骑行，空格急刹，Shift冲刺，C切换跟随视角，H鸣笛波纹')
     this.container.append(this.renderer.domElement)
 
     this.scene.background = new Color('#dce7d5')
@@ -85,7 +90,8 @@ export class GameEngine {
     this.world = buildWorld(CITY_LAYOUT)
     this.scene.add(this.world.root)
     this.rider = buildRiderVehicle()
-    this.scene.add(this.rider.root, this.dust.root)
+    this.trafficVisuals = buildTrafficVisuals(CITY_LAYOUT, this.traffic.signals, this.traffic.vehicles)
+    this.scene.add(this.rider.root, this.dust.root, this.trafficVisuals.root)
     this.updateRider()
 
     this.controls = new OrbitControls(this.previewCamera, this.renderer.domElement)
@@ -174,6 +180,8 @@ export class GameEngine {
 
   resetRider() {
     this.controller.reset()
+    this.traffic.reset()
+    this.trafficVisuals.update(0)
     this.collisionDisplayTime = 0
     this.setCityView('ride')
   }
@@ -210,6 +218,7 @@ export class GameEngine {
     this.keys.clear()
     this.controls.dispose()
     this.dust.dispose()
+    this.trafficVisuals.dispose()
     this.rider.dispose()
     this.world.dispose()
     this.sunlight.shadow.dispose()
@@ -224,6 +233,8 @@ export class GameEngine {
   private readonly clearInput = () => {
     this.keys.clear()
     this.controller.stop()
+    this.hornRemaining = 0
+    this.trafficVisuals.clearHorn()
   }
 
   private readonly onVisibilityChange = () => {
@@ -236,6 +247,12 @@ export class GameEngine {
     if (event.code === 'KeyC') {
       event.preventDefault()
       if (!event.repeat) this.setRideCameraMode(CAMERA_MODES[(CAMERA_MODES.indexOf(this.cameraMode) + 1) % CAMERA_MODES.length])
+    } else if (this.view === 'ride' && event.code === 'KeyH') {
+      event.preventDefault()
+      if (!event.repeat && this.hornRemaining <= 0) {
+        this.hornRemaining = 0.7
+        this.trafficVisuals.honk(this.controller.state, this.controller.state.heading)
+      }
     } else if (this.view === 'ride' && DRIVING_KEYS.has(event.code)) {
       if (!event.code.startsWith('Shift')) event.preventDefault()
       this.keys.add(event.code)
@@ -276,6 +293,10 @@ export class GameEngine {
     const deltaSeconds = Math.max(0, Math.min((time - this.previousTime) / 1000, 0.05))
     this.previousTime = time
     if (this.view === 'ride') {
+      const previousPosition = { x: this.controller.state.x, z: this.controller.state.z }
+      this.traffic.update(deltaSeconds, this.controller.state)
+      this.hornRemaining = Math.max(0, this.hornRemaining - deltaSeconds)
+      this.trafficVisuals.update(deltaSeconds)
       const forward = this.keys.has('KeyW') || this.keys.has('ArrowUp')
       const reverse = this.keys.has('KeyS') || this.keys.has('ArrowDown')
       this.controller.update(deltaSeconds, {
@@ -285,6 +306,9 @@ export class GameEngine {
         boost: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
       })
       const state = this.controller.state
+      const impact = this.traffic.checkCollision(state)
+      if (impact) this.controller.applyTrafficImpact(impact.normalX, impact.normalZ, impact.distance)
+      this.traffic.checkSignals(previousPosition, state)
       this.collisionDisplayTime = state.colliding ? 0.35 : Math.max(0, this.collisionDisplayTime - deltaSeconds)
       this.updateRider()
       this.dust.update(deltaSeconds, state, state.heading, state.speed, state.braking)
@@ -324,6 +348,7 @@ export class GameEngine {
           battery: state.battery, distance: state.distance, braking: state.braking,
           boosting: state.boosting, colliding: this.collisionDisplayTime > 0,
         },
+        traffic: this.traffic.getSnapshot(state, this.hornRemaining > 0),
         fps: this.fps,
         drawCalls: this.renderer.info.render.calls,
         triangleCount: this.renderer.info.render.triangles,

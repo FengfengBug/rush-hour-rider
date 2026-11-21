@@ -142,11 +142,62 @@ export interface CityLayout {
   readonly spawn: { readonly position: Point2; readonly facing: Direction }
 }
 
+export type TrafficLightPhase = 'red' | 'yellow' | 'green'
+
+export interface TrafficSignal {
+  id: string
+  x: number
+  z: number
+  phaseX: TrafficLightPhase
+  phaseZ: TrafficLightPhase
+  remainingX: number
+  remainingZ: number
+}
+
+export interface TrafficVehicle {
+  id: string
+  kind: 'car' | 'bus'
+  color: string
+  x: number
+  z: number
+  heading: number
+  speed: number
+  length: number
+  width: number
+  braking: boolean
+}
+
+export interface TrafficEvent {
+  id: number
+  type: 'red-light' | 'collision'
+  time: number
+  position: Point2
+  subjectId: string
+}
+
+export interface TrafficSnapshot {
+  vehicleCount: number
+  queuedCount: number
+  redLightCount: number
+  collisionCount: number
+  elapsedSeconds: number
+  hornActive: boolean
+  nearbySignal: {
+    intersectionId: string
+    axis: RoadAxis
+    phase: TrafficLightPhase
+    remaining: number
+    distance: number
+  } | null
+  events: TrafficEvent[]
+}
+
 export interface EngineSnapshot {
   view: CityView
   cameraMode: RideCameraMode
   riderPreview: RiderPreviewMode
   rider: RiderSnapshot
+  traffic: TrafficSnapshot
   fps: number
   drawCalls: number
   triangleCount: number

@@ -66,6 +66,27 @@ export class RiderController {
     for (let step = 0; step < steps; step += 1) this.step(deltaSeconds / steps, input)
   }
 
+  applyTrafficImpact(normalX: number, normalZ: number, distance: number) {
+    const state = this.state
+    const incomingSpeed = state.velocityX * normalX + state.velocityZ * normalZ
+    state.velocityX *= 0.4
+    state.velocityZ *= 0.4
+    if (incomingSpeed < 0) {
+      const rebound = Math.min(1.5, -incomingSpeed * 0.12) - incomingSpeed * 0.4
+      state.velocityX += normalX * rebound
+      state.velocityZ += normalZ * rebound
+    }
+    const oldX = state.x
+    const oldZ = state.z
+    this.move(normalX * distance, normalZ * distance, 0)
+    state.distance += Math.hypot(state.x - oldX, state.z - oldZ)
+    state.wheelTravel += (state.x - oldX) * Math.sin(state.heading) + (state.z - oldZ) * Math.cos(state.heading)
+    const forwardSpeed = state.velocityX * Math.sin(state.heading) + state.velocityZ * Math.cos(state.heading)
+    state.speed = Math.hypot(state.velocityX, state.velocityZ) * (forwardSpeed < 0 ? -1 : 1)
+    state.boosting = false
+    state.colliding = true
+  }
+
   private step(dt: number, input: DrivingInput) {
     const state = this.state
     let speed = state.velocityX * Math.sin(state.heading) + state.velocityZ * Math.cos(state.heading)
