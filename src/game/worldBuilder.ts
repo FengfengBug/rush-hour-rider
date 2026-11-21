@@ -4,8 +4,10 @@ import {
   CanvasTexture,
   Color,
   CylinderGeometry,
+  DynamicDrawUsage,
   Group,
   IcosahedronGeometry,
+  InstancedBufferAttribute,
   InstancedMesh,
   Material,
   Matrix4,
@@ -14,7 +16,9 @@ import {
   MeshStandardMaterial,
   Object3D,
   PlaneGeometry,
+  Ray,
   SRGBColorSpace,
+  Vector3,
 } from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { BuildingKind, CityBuilding, CityLayout, Direction } from './types'
@@ -49,7 +53,17 @@ export function buildWorld(layout: CityLayout) {
   const planeGeometry = new PlaneGeometry(1, 1)
   const trunkGeometry = new CylinderGeometry(1, 1, 1, 7)
   const crownGeometry = new IcosahedronGeometry(1, 0)
+  crownGeometry.computeBoundingBox()
   const matte = new MeshStandardMaterial({ roughness: 0.92, flatShading: true })
+  const canopyMaterial = new MeshStandardMaterial({ roughness: 0.92, flatShading: true, transparent: true, depthWrite: false })
+  canopyMaterial.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float canopyOpacity;\nvarying float vCanopyOpacity;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCanopyOpacity = canopyOpacity;')
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vCanopyOpacity;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= vCanopyOpacity;')
+  }
   const glass = new MeshStandardMaterial({ roughness: 0.4, metalness: 0.18 })
   const unlit = new MeshBasicMaterial({ toneMapped: false })
   const transform = new Object3D()
@@ -75,7 +89,7 @@ export function buildWorld(layout: CityLayout) {
   const markings = batch('road-markings', boxGeometry, unlit, false)
   const windows = batch('window-panes', planeGeometry, glass, false)
   const trunks = batch('tree-trunks', trunkGeometry)
-  const crowns = batch('tree-canopies', crownGeometry)
+  const crowns = batch('tree-canopies', crownGeometry, canopyMaterial)
   const furniture = batch('street-furniture')
   const signs: Sign[] = []
 
@@ -297,6 +311,13 @@ export function buildWorld(layout: CityLayout) {
     sign('便民换电', '#32647e', x + Math.sin(yaw) * 0.75, 2.7, z + Math.cos(yaw) * 0.75, 2.45, 0.48, yaw)
   }
 
+  const canopyBounds = crowns.map(({ matrix }) => crownGeometry.boundingBox!.clone().applyMatrix4(matrix).expandByScalar(0.4))
+  const canopyOpacity = new InstancedBufferAttribute(new Float32Array(crowns.length).fill(1), 1).setUsage(DynamicDrawUsage)
+  crownGeometry.setAttribute('canopyOpacity', canopyOpacity)
+  const sightline = new Ray()
+  const sightTarget = new Vector3()
+  const sightHit = new Vector3()
+
   let instanceCount = 0
   for (const entry of batches) {
     const mesh = new InstancedMesh(entry.geometry, entry.material, entry.parts.length)
@@ -363,10 +384,34 @@ export function buildWorld(layout: CityLayout) {
   return {
     root,
     instanceCount,
+    updateCanopyOcclusion(cameraPosition: Vector3, riderPosition: Vector3 | null, deltaSeconds: number) {
+      let distance = 0
+      if (riderPosition) {
+        sightTarget.copy(riderPosition).y += 1.8
+        sightline.origin.copy(cameraPosition)
+        sightline.direction.subVectors(sightTarget, cameraPosition)
+        distance = sightline.direction.length()
+        sightline.direction.normalize()
+      }
+      const blend = 1 - Math.exp(-12 * deltaSeconds)
+      let changed = false
+      canopyBounds.forEach((bounds, index) => {
+        const blocked = riderPosition && (bounds.containsPoint(cameraPosition)
+          || sightline.intersectBox(bounds, sightHit) && cameraPosition.distanceTo(sightHit) < distance)
+        const target = blocked ? 0.08 : 1
+        const current = canopyOpacity.getX(index)
+        const next = !riderPosition || Math.abs(target - current) < 0.001 ? target : current + (target - current) * blend
+        if (next !== current) {
+          canopyOpacity.setX(index, next)
+          changed = true
+        }
+      })
+      if (changed) canopyOpacity.needsUpdate = true
+    },
     dispose() {
       for (const child of root.children) if (child instanceof InstancedMesh) child.dispose()
       for (const geometry of [boxGeometry, planeGeometry, trunkGeometry, crownGeometry, signGeometry]) geometry.dispose()
-      for (const material of [matte, glass, unlit, signMaterial]) material.dispose()
+      for (const material of [matte, canopyMaterial, glass, unlit, signMaterial]) material.dispose()
       atlas.dispose()
       root.clear()
       root.removeFromParent()

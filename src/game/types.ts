@@ -14,8 +14,21 @@ export type Direction = 'north' | 'east' | 'south' | 'west'
 export type RoadAxis = 'x' | 'z'
 export type DistrictId = 'food-street' | 'old-neighborhood' | 'cbd' | 'civic-center'
 export type BuildingKind = 'shop' | 'apartment' | 'office' | 'civic' | 'hospital' | 'school'
-export type CityView = 'rider-rear' | 'rider-side' | 'overview' | DistrictId
+export type CityView = 'ride' | 'rider-rear' | 'rider-side' | 'overview' | DistrictId
 export type RiderPreviewMode = 'parked' | 'motion' | 'braking'
+export type RideCameraMode = 'near' | 'far' | 'overhead'
+
+export interface RiderSnapshot {
+  x: number
+  z: number
+  heading: number
+  speed: number
+  battery: number
+  distance: number
+  braking: boolean
+  boosting: boolean
+  colliding: boolean
+}
 
 export interface RoadLane {
   readonly id: string
@@ -130,6 +143,10 @@ export interface CityLayout {
 }
 
 export interface EngineSnapshot {
+  view: CityView
+  cameraMode: RideCameraMode
+  riderPreview: RiderPreviewMode
+  rider: RiderSnapshot
   fps: number
   drawCalls: number
   triangleCount: number

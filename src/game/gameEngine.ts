@@ -4,6 +4,7 @@ import {
   DirectionalLight,
   Fog,
   HemisphereLight,
+  InstancedMesh,
   OrthographicCamera,
   PCFShadowMap,
   Scene,
@@ -14,7 +15,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CITY_LAYOUT } from './cityLayout'
 import { buildWorld } from './worldBuilder'
 import { buildRiderVehicle, RIDER_WHEEL_RADIUS } from './riderVehicle'
-import type { CityView, Direction, EngineSnapshot, RiderPreviewMode } from './types'
+import { RiderController } from './riderController'
+import { FollowCamera } from './followCamera'
+import { buildBrakeDust } from './brakeDust'
+import type { CityView, Direction, EngineSnapshot, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
   'food-street': 'shaxian-snacks',
@@ -23,21 +27,30 @@ const DISTRICT_FOCUS = {
   'civic-center': 'south-community-hospital',
 } as const
 const VIEW_ANGLE: Record<Direction, number> = { south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 }
+const CAMERA_MODES: RideCameraMode[] = ['near', 'far', 'overhead']
+const DRIVING_KEYS = new Set(['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'ShiftLeft', 'ShiftRight'])
 
 export class GameEngine {
   private readonly container: HTMLElement
   private readonly onSnapshot: (snapshot: EngineSnapshot) => void
   private readonly scene = new Scene()
-  private readonly camera = new OrthographicCamera(-300, 300, 300, -300, 0.1, 2400)
+  private readonly previewCamera = new OrthographicCamera(-300, 300, 300, -300, 0.1, 2400)
+  private readonly followCamera = new FollowCamera(CITY_LAYOUT.buildings)
+  private readonly controller = new RiderController(CITY_LAYOUT)
+  private readonly dust = buildBrakeDust()
+  private readonly keys = new Set<string>()
   private readonly renderer: WebGLRenderer
   private readonly controls: OrbitControls
   private readonly resizeObserver: ResizeObserver
   private readonly sunlight = new DirectionalLight('#fff0ce', 2.7)
   private readonly world: ReturnType<typeof buildWorld>
   private readonly rider: ReturnType<typeof buildRiderVehicle>
+  private view: CityView = 'ride'
+  private cameraMode: RideCameraMode = 'near'
   private riderPreview: RiderPreviewMode = 'parked'
   private previewTime = 0
   private wheelAngle = 0
+  private collisionDisplayTime = 0
   private frameId: number | null = null
   private previousTime = 0
   private lastSnapshotTime = 0
@@ -55,36 +68,27 @@ export class GameEngine {
     this.renderer.toneMapping = ACESFilmicToneMapping
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = PCFShadowMap
+    this.renderer.domElement.tabIndex = 0
     this.renderer.domElement.setAttribute('role', 'img')
-    this.renderer.domElement.setAttribute('aria-label', '可旋转缩放的中国微缩城市与外卖骑手，黄色头盔、反光服、电动车及极速达保温箱')
+    this.renderer.domElement.setAttribute('aria-label', '外卖骑手驾驶场景，WASD或方向键骑行，空格急刹，Shift冲刺，C切换跟随视角')
     this.container.append(this.renderer.domElement)
 
     this.scene.background = new Color('#dce7d5')
     this.scene.fog = new Fog('#dce7d5', 850, 1500)
     this.scene.add(new HemisphereLight('#fff7e6', '#859a80', 1.8))
-    this.sunlight.position.set(-240, 410, 220)
     this.sunlight.castShadow = true
     this.sunlight.shadow.mapSize.set(2048, 2048)
-    this.sunlight.shadow.camera.left = -290
-    this.sunlight.shadow.camera.right = 290
-    this.sunlight.shadow.camera.top = 290
-    this.sunlight.shadow.camera.bottom = -290
     this.sunlight.shadow.camera.near = 30
     this.sunlight.shadow.camera.far = 950
-    this.sunlight.shadow.normalBias = 0.06
-    this.sunlight.shadow.bias = -0.0001
-    // 驻车时缓存阴影，模型动作演示时才逐帧刷新。
     this.sunlight.shadow.autoUpdate = false
-    this.sunlight.shadow.needsUpdate = true
     this.scene.add(this.sunlight, this.sunlight.target)
     this.world = buildWorld(CITY_LAYOUT)
     this.scene.add(this.world.root)
     this.rider = buildRiderVehicle()
-    this.rider.root.position.set(CITY_LAYOUT.spawn.position.x, 0, CITY_LAYOUT.spawn.position.z)
-    this.rider.root.rotation.y = VIEW_ANGLE[CITY_LAYOUT.spawn.facing]
-    this.scene.add(this.rider.root)
+    this.scene.add(this.rider.root, this.dust.root)
+    this.updateRider()
 
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement)
+    this.controls = new OrbitControls(this.previewCamera, this.renderer.domElement)
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.08
     this.controls.screenSpacePanning = false
@@ -93,41 +97,59 @@ export class GameEngine {
     this.controls.minZoom = 0.7
     this.controls.maxZoom = 180
     this.controls.maxTargetRadius = CITY_LAYOUT.size * 0.8
-    this.setCityView('rider-rear')
+    this.setCityView('ride')
 
     this.resizeObserver = new ResizeObserver(this.resize)
     this.resizeObserver.observe(this.container)
     window.addEventListener('resize', this.resize)
+    window.addEventListener('keydown', this.onKeyDown)
+    window.addEventListener('keyup', this.onKeyUp)
+    window.addEventListener('blur', this.clearInput)
+    document.addEventListener('visibilitychange', this.onVisibilityChange)
+    this.renderer.domElement.addEventListener('pointerdown', this.focusCanvas)
     this.resize()
   }
 
   setCityView(view: CityView) {
-    this.controls.enableDamping = false
-    this.controls.update()
+    this.clearInput()
+    this.view = view
+    this.riderPreview = 'parked'
+    this.previewTime = 0
+    this.dust.clear()
+    this.updateRider()
     const riderView = view === 'rider-rear' || view === 'rider-side'
-    const shadowExtent = riderView ? 7 : 290
-    this.sunlight.target.position.copy(riderView ? this.rider.root.position : this.scene.position)
+    const shadowExtent = view === 'ride' ? 40 : riderView ? 7 : 290
+    this.sunlight.target.position.copy(view === 'ride' || riderView ? this.rider.root.position : this.scene.position)
     this.sunlight.position.copy(this.sunlight.target.position).add({ x: -240, y: 410, z: 220 })
     this.sunlight.shadow.camera.left = -shadowExtent
     this.sunlight.shadow.camera.right = shadowExtent
     this.sunlight.shadow.camera.top = shadowExtent
     this.sunlight.shadow.camera.bottom = -shadowExtent
-    this.sunlight.shadow.normalBias = riderView ? 0.005 : 0.06
-    this.sunlight.shadow.bias = riderView ? -0.000005 : -0.0001
+    this.sunlight.shadow.normalBias = view === 'ride' || riderView ? 0.005 : 0.06
+    this.sunlight.shadow.bias = view === 'ride' || riderView ? -0.000005 : -0.0001
     this.sunlight.shadow.camera.updateProjectionMatrix()
     this.sunlight.shadow.needsUpdate = true
+    this.controls.enabled = view !== 'ride'
+    if (view === 'ride') {
+      this.followCamera.reset(this.controller.state, this.controller.state.heading)
+      this.focusCanvas()
+      return
+    }
+
+    this.controls.enableDamping = false
+    this.controls.update()
     if (riderView) {
-      const { x, z } = this.rider.root.position
+      const { x, y, z } = this.rider.root.position
       const angle = this.rider.root.rotation.y
       const side = view === 'rider-rear' ? 4 : 6
       const back = view === 'rider-rear' ? -6 : 1
-      this.controls.target.set(x, 1.1, z)
-      this.camera.position.set(x + Math.cos(angle) * side + Math.sin(angle) * back, 4.2, z - Math.sin(angle) * side + Math.cos(angle) * back)
-      this.camera.zoom = 110
+      this.controls.target.set(x, y + 1.1, z)
+      this.previewCamera.position.set(x + Math.cos(angle) * side + Math.sin(angle) * back, y + 4.2, z - Math.sin(angle) * side + Math.cos(angle) * back)
+      this.previewCamera.zoom = 110
     } else if (view === 'overview') {
       this.controls.target.set(0, 0, 0)
-      this.camera.position.set(340, 330, 420)
-      this.camera.zoom = 1
+      this.previewCamera.position.set(340, 330, 420)
+      this.previewCamera.zoom = 1
     } else {
       const landmark = CITY_LAYOUT.landmarks.find((entry) => entry.id === DISTRICT_FOCUS[view])!
       const building = CITY_LAYOUT.buildings.find((entry) => entry.id === landmark.buildingId)!
@@ -135,15 +157,29 @@ export class GameEngine {
       const z = (building.bounds.minZ + building.bounds.maxZ) / 2
       const angle = VIEW_ANGLE[landmark.access.side]
       this.controls.target.set(x, 4, z)
-      this.camera.position.set(x + Math.sin(angle) * 160 + Math.cos(angle) * 110, 134, z + Math.cos(angle) * 160 - Math.sin(angle) * 110)
-      this.camera.zoom = 5.8
+      this.previewCamera.position.set(x + Math.sin(angle) * 160 + Math.cos(angle) * 110, 134, z + Math.cos(angle) * 160 - Math.sin(angle) * 110)
+      this.previewCamera.zoom = 5.8
     }
-    this.camera.updateProjectionMatrix()
+    this.previewCamera.updateProjectionMatrix()
     this.controls.update()
     this.controls.enableDamping = true
   }
 
+  setRideCameraMode(mode: RideCameraMode) {
+    this.cameraMode = mode
+    this.followCamera.setMode(mode)
+    if (this.view !== 'ride') this.setCityView('ride')
+    this.focusCanvas()
+  }
+
+  resetRider() {
+    this.controller.reset()
+    this.collisionDisplayTime = 0
+    this.setCityView('ride')
+  }
+
   setRiderPreviewMode(mode: RiderPreviewMode) {
+    if (this.view === 'ride') this.setCityView('rider-rear')
     this.riderPreview = mode
     this.previewTime = 0
     this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: 0, leanAngle: 0, braking: mode === 'braking' })
@@ -166,7 +202,14 @@ export class GameEngine {
     }
     this.resizeObserver.disconnect()
     window.removeEventListener('resize', this.resize)
+    window.removeEventListener('keydown', this.onKeyDown)
+    window.removeEventListener('keyup', this.onKeyUp)
+    window.removeEventListener('blur', this.clearInput)
+    document.removeEventListener('visibilitychange', this.onVisibilityChange)
+    this.renderer.domElement.removeEventListener('pointerdown', this.focusCanvas)
+    this.keys.clear()
     this.controls.dispose()
+    this.dust.dispose()
     this.rider.dispose()
     this.world.dispose()
     this.sunlight.shadow.dispose()
@@ -176,35 +219,91 @@ export class GameEngine {
     this.renderer.domElement.remove()
   }
 
+  private readonly focusCanvas = () => this.renderer.domElement.focus({ preventScroll: true })
+
+  private readonly clearInput = () => {
+    this.keys.clear()
+    this.controller.stop()
+  }
+
+  private readonly onVisibilityChange = () => {
+    if (document.hidden) this.clearInput()
+  }
+
+  private readonly onKeyDown = (event: KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, button, a, summary, [contenteditable="true"]')) return
+    if (event.code === 'KeyC') {
+      event.preventDefault()
+      if (!event.repeat) this.setRideCameraMode(CAMERA_MODES[(CAMERA_MODES.indexOf(this.cameraMode) + 1) % CAMERA_MODES.length])
+    } else if (this.view === 'ride' && DRIVING_KEYS.has(event.code)) {
+      if (!event.code.startsWith('Shift')) event.preventDefault()
+      this.keys.add(event.code)
+    }
+  }
+
+  private readonly onKeyUp = (event: KeyboardEvent) => { this.keys.delete(event.code) }
+
+  private updateRider() {
+    const state = this.controller.state
+    const onSidewalk = CITY_LAYOUT.sidewalks.some(({ bounds }) => state.x >= bounds.minX && state.x <= bounds.maxX && state.z >= bounds.minZ && state.z <= bounds.maxZ)
+    const inBlock = CITY_LAYOUT.blocks.some(({ bounds }) => state.x >= bounds.minX && state.x <= bounds.maxX && state.z >= bounds.minZ && state.z <= bounds.maxZ)
+    this.rider.root.position.set(state.x, onSidewalk ? 0.24 : inBlock ? 0.16 : 0, state.z)
+    this.rider.root.rotation.y = state.heading
+    this.wheelAngle = state.wheelTravel / RIDER_WHEEL_RADIUS % (Math.PI * 2)
+    this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: state.steeringAngle, leanAngle: state.leanAngle, braking: state.braking })
+  }
+
   private readonly resize = () => {
     this.viewportWidth = Math.max(this.container.clientWidth, 1)
     this.viewportHeight = Math.max(this.container.clientHeight, 1)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.setSize(this.viewportWidth, this.viewportHeight, false)
+    this.followCamera.resize(this.viewportWidth, this.viewportHeight)
     const aspect = this.viewportWidth / this.viewportHeight
     const halfHeight = 295 / Math.min(aspect, 1)
     const halfWidth = halfHeight * aspect
-    this.camera.left = -halfWidth
-    this.camera.right = halfWidth
-    this.camera.top = halfHeight
-    this.camera.bottom = -halfHeight
+    this.previewCamera.left = -halfWidth
+    this.previewCamera.right = halfWidth
+    this.previewCamera.top = halfHeight
+    this.previewCamera.bottom = -halfHeight
     const offsetX = aspect > 1.1 ? -this.viewportWidth * 0.06 : 0
     const offsetY = aspect < 1 && this.viewportHeight <= 640 ? -this.viewportHeight * 0.08 : 0
-    this.camera.setViewOffset(this.viewportWidth, this.viewportHeight, offsetX, offsetY, this.viewportWidth, this.viewportHeight)
+    this.previewCamera.setViewOffset(this.viewportWidth, this.viewportHeight, offsetX, offsetY, this.viewportWidth, this.viewportHeight)
   }
 
   private readonly tick = (time: number) => {
-    const deltaSeconds = Math.min((time - this.previousTime) / 1000, 0.05)
+    const deltaSeconds = Math.max(0, Math.min((time - this.previousTime) / 1000, 0.05))
     this.previousTime = time
-    if (this.riderPreview === 'motion') {
-      this.previewTime += deltaSeconds
-      this.wheelAngle = (this.wheelAngle + deltaSeconds * 3.2 / RIDER_WHEEL_RADIUS) % (Math.PI * 2)
-      const turn = Math.sin(this.previewTime * 1.3)
-      this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: turn * 0.16, leanAngle: -turn * 0.2, braking: false })
+    if (this.view === 'ride') {
+      const forward = this.keys.has('KeyW') || this.keys.has('ArrowUp')
+      const reverse = this.keys.has('KeyS') || this.keys.has('ArrowDown')
+      this.controller.update(deltaSeconds, {
+        throttle: Number(forward) - Number(reverse),
+        steering: Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft')) - Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')),
+        brake: this.keys.has('Space') || forward && reverse,
+        boost: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
+      })
+      const state = this.controller.state
+      this.collisionDisplayTime = state.colliding ? 0.35 : Math.max(0, this.collisionDisplayTime - deltaSeconds)
+      this.updateRider()
+      this.dust.update(deltaSeconds, state, state.heading, state.speed, state.braking)
+      this.followCamera.update(state, state.heading, deltaSeconds)
+      this.sunlight.target.position.copy(this.rider.root.position)
+      this.sunlight.position.copy(this.sunlight.target.position).add({ x: -240, y: 410, z: 220 })
       this.sunlight.shadow.needsUpdate = true
+    } else {
+      if (this.riderPreview === 'motion') {
+        this.previewTime += deltaSeconds
+        this.wheelAngle = (this.wheelAngle + deltaSeconds * 3.2 / RIDER_WHEEL_RADIUS) % (Math.PI * 2)
+        const turn = Math.sin(this.previewTime * 1.3)
+        this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: turn * 0.16, leanAngle: -turn * 0.2, braking: false })
+        this.sunlight.shadow.needsUpdate = true
+      }
+      this.controls.update(deltaSeconds)
     }
-    this.controls.update(deltaSeconds)
-    this.renderer.render(this.scene, this.camera)
+    this.world.updateCanopyOcclusion(this.followCamera.camera.position, this.view === 'ride' ? this.rider.root.position : null, deltaSeconds)
+    this.renderer.render(this.scene, this.view === 'ride' ? this.followCamera.camera : this.previewCamera)
     this.sampleFrames += 1
     const sampleDuration = time - this.sampleStartedAt
     if (sampleDuration >= 500) {
@@ -213,11 +312,22 @@ export class GameEngine {
       this.sampleStartedAt = time
     }
     if (time - this.lastSnapshotTime >= 100) {
+      const state = this.controller.state
+      let instanceCount = 0
+      this.scene.traverse((object) => { if (object instanceof InstancedMesh && object.visible) instanceCount += object.count })
       this.onSnapshot({
+        view: this.view,
+        cameraMode: this.cameraMode,
+        riderPreview: this.riderPreview,
+        rider: {
+          x: state.x, z: state.z, heading: state.heading, speed: state.speed,
+          battery: state.battery, distance: state.distance, braking: state.braking,
+          boosting: state.boosting, colliding: this.collisionDisplayTime > 0,
+        },
         fps: this.fps,
         drawCalls: this.renderer.info.render.calls,
         triangleCount: this.renderer.info.render.triangles,
-        instanceCount: this.world.instanceCount,
+        instanceCount,
         viewportWidth: this.viewportWidth,
         viewportHeight: this.viewportHeight,
         pixelRatio: this.renderer.getPixelRatio(),
