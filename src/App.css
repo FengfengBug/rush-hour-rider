@@ -11,20 +11,24 @@
 .scene-brand p { margin: 3px 0 0; font-size: 9px; font-weight: 650; letter-spacing: 0.15em; }
 .task-badge { flex: none; padding: 9px 12px; border: 1px solid #d5d7c7; border-radius: 6px; color: #58604e; background: #faf7edeb; font-size: 11px; letter-spacing: 0.05em; }
 
-.city-explorer { display: flex; flex-direction: column; align-self: start; gap: 10px; width: 232px; max-width: 100%; min-height: 0; max-height: 100%; }
-.city-explorer-intro { flex: none; padding: 10px 12px; border-radius: 8px; background: #fcf8efed; }
+.city-explorer { display: flex; flex-direction: column; align-self: start; gap: 8px; width: 232px; max-width: 100%; min-height: 0; max-height: 100%; }
+.city-explorer-intro { flex: none; padding: 8px 10px; border-radius: 8px; background: #fcf8efed; }
 .city-explorer-intro h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0; font-size: 12px; font-weight: 650; line-height: 1.5; }
 .city-explorer-intro h2 span { color: #647363; font-size: 9px; font-weight: 400; }
 .city-explorer-intro p { margin: 5px 0 0; color: #536451; font-size: 10px; line-height: 1.5; }
-.city-views { display: grid; flex: none; gap: 6px; }
-.city-view { --view-color: #416c5d; --view-tint: #e2ede3; display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 36px; padding: 6px 10px; border: 1px solid #d9ddce; border-radius: 8px; color: #465346; background: #fcf8efed; font-size: 12px; line-height: 1.4; text-align: left; white-space: nowrap; cursor: pointer; pointer-events: auto; }
+.city-views { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: none; gap: 6px; }
+.city-view { --view-color: #416c5d; --view-tint: #e2ede3; display: flex; align-items: center; gap: 5px; min-width: 0; min-height: 32px; padding: 6px 7px; border: 1px solid #d9ddce; border-radius: 8px; color: #465346; background: #fcf8efed; font-size: 11px; line-height: 1.4; text-align: left; white-space: nowrap; cursor: pointer; pointer-events: auto; }
 .city-view[data-view="food-street"], .city-view[data-view="old-neighborhood"] { --view-color: #95593f; --view-tint: #f4e1d5; }
-.city-view[data-view="cbd"] { --view-color: #85621f; --view-tint: #f4ebcd; }
+.city-view[data-view="rider-rear"], .city-view[data-view="rider-side"], .city-view[data-view="cbd"] { --view-color: #85621f; --view-tint: #f4ebcd; }
 .city-view:hover { border-color: var(--view-color); background: var(--view-tint); }
 .city-view[aria-pressed="true"] { border-color: var(--view-color); color: var(--view-color); background: var(--view-tint); font-weight: 650; }
-.city-view:focus-visible { outline: 2px solid #3b6756; outline-offset: 3px; }
-.city-view-number { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 5px; color: var(--view-color); background: var(--view-tint); font-size: 10px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.city-view:focus-visible, .rider-preview:focus-visible { outline: 2px solid #3b6756; outline-offset: 3px; }
+.city-view-number { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border-radius: 5px; color: var(--view-color); background: var(--view-tint); font-size: 9px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .city-view[aria-pressed="true"] .city-view-number { color: #fffaf0; background: var(--view-color); }
+.rider-preview-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); flex: none; gap: 5px; width: 232px; max-width: 100%; }
+.rider-preview { min-width: 0; min-height: 30px; padding: 5px 4px; border: 1px solid #d9ddce; border-radius: 6px; color: #465346; background: #fcf8efed; font-size: 11px; line-height: 1.4; white-space: nowrap; cursor: pointer; pointer-events: auto; }
+.rider-preview:hover { border-color: #85621f; background: #f4ebcd; }
+.rider-preview[aria-pressed="true"] { border-color: #85621f; color: #85621f; background: #f4ebcd; font-weight: 650; }
 
 .city-data { flex: 0 1 auto; width: 100%; min-height: 0; overflow: auto; overscroll-behavior: contain; pointer-events: auto; border: 1px solid #d9ddcd; border-radius: 10px; background: #fcf8eff5; scrollbar-width: thin; scrollbar-color: #a5b29e #fcf8ef; }
 .city-data summary { position: sticky; top: 0; z-index: 1; padding: 10px 12px; color: #435542; background: #fcf8ef; font-size: 11px; font-weight: 650; line-height: 1.5; cursor: pointer; pointer-events: auto; }
@@ -82,36 +86,50 @@
   .render-status dl { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
   .scene-overlay { padding: 14px; gap: 12px; }
   .scene-header { gap: 10px; }
   .scene-brand { gap: 8px; }
   .brand-icon { width: 37px; height: 37px; border-radius: 10px; }
-  .scene-brand h1 { font-size: 21px; }
+  .scene-brand h1 { font-size: 21px; line-height: 1.2; }
   .scene-brand p { font-size: 7px; }
   .task-badge { padding: 7px 8px; font-size: 9px; }
   .city-views { gap: 5px; }
-  .city-view { gap: 6px; min-height: 32px; padding: 6px 8px; }
+  .city-view { gap: 5px; min-height: 32px; padding: 5px 7px; }
   .city-view-number { width: 18px; height: 18px; }
-  .city-data summary { padding: 9px 11px; }
+  .rider-preview-modes { width: 100%; }
+  .city-data summary { padding: 8px 10px; }
+  .city-data summary small { display: inline; margin: 0 0 0 6px; font-size: 9px; }
   .scene-caption { column-gap: 10px; }
   .scene-eyebrow { font-size: 9px; }
 }
 
-@media (max-width: 480px) and (max-height: 640px) {
+@media (max-width: 560px) and (max-height: 640px), (max-height: 440px) {
   .scene-overlay { padding: 10px; gap: 8px; }
   .scene-brand { padding: 5px 8px; }
-  .city-explorer-intro { padding: 6px 8px; }
-  .city-explorer-intro h2 span { display: none; }
+  .city-explorer { gap: 6px; }
+  .city-explorer-intro { display: none; }
+  .city-view { gap: 4px; min-height: 30px; padding: 4px 6px; }
+  .city-data summary { padding: 7px 8px; }
+  .city-data summary small { display: inline; margin: 0 0 0 6px; font-size: 9px; }
+  .scene-footer { gap: 6px; }
+  .scene-caption { padding: 6px 8px; }
+  .render-status { gap: 4px; padding: 7px 8px; }
+  .render-status dl { gap: 4px 8px; }
+  .render-status dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+  .render-status dd { margin: 0; font-size: 10px; }
 }
 
 @media (max-height: 440px) {
-  .scene-overlay { padding: 12px 18px; gap: 10px; }
+  .scene-overlay { padding: 10px 18px; gap: 8px; }
   .scene-brand { gap: 8px; }
   .brand-icon { width: 34px; height: 34px; border-radius: 9px; }
-  .scene-brand h1 { font-size: 19px; }
+  .scene-brand h1 { font-size: 19px; line-height: 1.2; }
   .scene-brand p { font-size: 7px; }
   .task-badge { padding: 6px 9px; font-size: 9px; }
-  .scene-footer { gap: 6px; }
-  .render-status { padding: 8px 12px; }
+}
+
+@media (min-width: 561px) and (max-height: 440px) {
+  .render-status { flex-direction: row; align-items: center; gap: 12px; }
+  .render-status dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

@@ -13,7 +13,8 @@ import {
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CITY_LAYOUT } from './cityLayout'
 import { buildWorld } from './worldBuilder'
-import type { CityView, Direction, EngineSnapshot } from './types'
+import { buildRiderVehicle, RIDER_WHEEL_RADIUS } from './riderVehicle'
+import type { CityView, Direction, EngineSnapshot, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
   'food-street': 'shaxian-snacks',
@@ -33,6 +34,10 @@ export class GameEngine {
   private readonly resizeObserver: ResizeObserver
   private readonly sunlight = new DirectionalLight('#fff0ce', 2.7)
   private readonly world: ReturnType<typeof buildWorld>
+  private readonly rider: ReturnType<typeof buildRiderVehicle>
+  private riderPreview: RiderPreviewMode = 'parked'
+  private previewTime = 0
+  private wheelAngle = 0
   private frameId: number | null = null
   private previousTime = 0
   private lastSnapshotTime = 0
@@ -51,7 +56,7 @@ export class GameEngine {
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = PCFShadowMap
     this.renderer.domElement.setAttribute('role', 'img')
-    this.renderer.domElement.setAttribute('aria-label', '可旋转缩放的中国风微缩城市，包含美食街、红砖小区、玻璃写字楼、医院与学校')
+    this.renderer.domElement.setAttribute('aria-label', '可旋转缩放的中国微缩城市与外卖骑手，黄色头盔、反光服、电动车及极速达保温箱')
     this.container.append(this.renderer.domElement)
 
     this.scene.background = new Color('#dce7d5')
@@ -68,12 +73,16 @@ export class GameEngine {
     this.sunlight.shadow.camera.far = 950
     this.sunlight.shadow.normalBias = 0.06
     this.sunlight.shadow.bias = -0.0001
-    // 城市当前为静态几何，移动预览相机不需要重画光源阴影。
+    // 驻车时缓存阴影，模型动作演示时才逐帧刷新。
     this.sunlight.shadow.autoUpdate = false
     this.sunlight.shadow.needsUpdate = true
-    this.scene.add(this.sunlight)
+    this.scene.add(this.sunlight, this.sunlight.target)
     this.world = buildWorld(CITY_LAYOUT)
     this.scene.add(this.world.root)
+    this.rider = buildRiderVehicle()
+    this.rider.root.position.set(CITY_LAYOUT.spawn.position.x, 0, CITY_LAYOUT.spawn.position.z)
+    this.rider.root.rotation.y = VIEW_ANGLE[CITY_LAYOUT.spawn.facing]
+    this.scene.add(this.rider.root)
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
@@ -82,9 +91,9 @@ export class GameEngine {
     this.controls.minPolarAngle = 0.2
     this.controls.maxPolarAngle = Math.PI / 2.25
     this.controls.minZoom = 0.7
-    this.controls.maxZoom = 14
+    this.controls.maxZoom = 180
     this.controls.maxTargetRadius = CITY_LAYOUT.size * 0.8
-    this.setCityView('overview')
+    this.setCityView('rider-rear')
 
     this.resizeObserver = new ResizeObserver(this.resize)
     this.resizeObserver.observe(this.container)
@@ -95,7 +104,27 @@ export class GameEngine {
   setCityView(view: CityView) {
     this.controls.enableDamping = false
     this.controls.update()
-    if (view === 'overview') {
+    const riderView = view === 'rider-rear' || view === 'rider-side'
+    const shadowExtent = riderView ? 7 : 290
+    this.sunlight.target.position.copy(riderView ? this.rider.root.position : this.scene.position)
+    this.sunlight.position.copy(this.sunlight.target.position).add({ x: -240, y: 410, z: 220 })
+    this.sunlight.shadow.camera.left = -shadowExtent
+    this.sunlight.shadow.camera.right = shadowExtent
+    this.sunlight.shadow.camera.top = shadowExtent
+    this.sunlight.shadow.camera.bottom = -shadowExtent
+    this.sunlight.shadow.normalBias = riderView ? 0.005 : 0.06
+    this.sunlight.shadow.bias = riderView ? -0.000005 : -0.0001
+    this.sunlight.shadow.camera.updateProjectionMatrix()
+    this.sunlight.shadow.needsUpdate = true
+    if (riderView) {
+      const { x, z } = this.rider.root.position
+      const angle = this.rider.root.rotation.y
+      const side = view === 'rider-rear' ? 4 : 6
+      const back = view === 'rider-rear' ? -6 : 1
+      this.controls.target.set(x, 1.1, z)
+      this.camera.position.set(x + Math.cos(angle) * side + Math.sin(angle) * back, 4.2, z - Math.sin(angle) * side + Math.cos(angle) * back)
+      this.camera.zoom = 110
+    } else if (view === 'overview') {
       this.controls.target.set(0, 0, 0)
       this.camera.position.set(340, 330, 420)
       this.camera.zoom = 1
@@ -112,6 +141,13 @@ export class GameEngine {
     this.camera.updateProjectionMatrix()
     this.controls.update()
     this.controls.enableDamping = true
+  }
+
+  setRiderPreviewMode(mode: RiderPreviewMode) {
+    this.riderPreview = mode
+    this.previewTime = 0
+    this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: 0, leanAngle: 0, braking: mode === 'braking' })
+    this.sunlight.shadow.needsUpdate = true
   }
 
   start() {
@@ -131,6 +167,7 @@ export class GameEngine {
     this.resizeObserver.disconnect()
     window.removeEventListener('resize', this.resize)
     this.controls.dispose()
+    this.rider.dispose()
     this.world.dispose()
     this.sunlight.shadow.dispose()
     this.scene.clear()
@@ -147,17 +184,25 @@ export class GameEngine {
     const aspect = this.viewportWidth / this.viewportHeight
     const halfHeight = 295 / Math.min(aspect, 1)
     const halfWidth = halfHeight * aspect
-    const offset = aspect > 1.1 ? halfWidth * 0.12 : 0
-    this.camera.left = -halfWidth - offset
-    this.camera.right = halfWidth - offset
+    this.camera.left = -halfWidth
+    this.camera.right = halfWidth
     this.camera.top = halfHeight
     this.camera.bottom = -halfHeight
-    this.camera.updateProjectionMatrix()
+    const offsetX = aspect > 1.1 ? -this.viewportWidth * 0.06 : 0
+    const offsetY = aspect < 1 && this.viewportHeight <= 640 ? -this.viewportHeight * 0.08 : 0
+    this.camera.setViewOffset(this.viewportWidth, this.viewportHeight, offsetX, offsetY, this.viewportWidth, this.viewportHeight)
   }
 
   private readonly tick = (time: number) => {
     const deltaSeconds = Math.min((time - this.previousTime) / 1000, 0.05)
     this.previousTime = time
+    if (this.riderPreview === 'motion') {
+      this.previewTime += deltaSeconds
+      this.wheelAngle = (this.wheelAngle + deltaSeconds * 3.2 / RIDER_WHEEL_RADIUS) % (Math.PI * 2)
+      const turn = Math.sin(this.previewTime * 1.3)
+      this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: turn * 0.16, leanAngle: -turn * 0.2, braking: false })
+      this.sunlight.shadow.needsUpdate = true
+    }
     this.controls.update(deltaSeconds)
     this.renderer.render(this.scene, this.camera)
     this.sampleFrames += 1
