@@ -1,7 +1,7 @@
 .game-shell { position: relative; width: 100%; height: 100%; isolation: isolate; }
 .game-viewport { position: absolute; inset: 0; }
 .game-viewport canvas { display: block; width: 100%; height: 100%; }
-.scene-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 30px 36px; pointer-events: none; }
+.scene-overlay { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: 22px; padding: 30px 36px; pointer-events: none; }
 .scene-header, .scene-brand, .scene-footer, .scene-eyebrow, .render-status, .render-status dl { display: flex; align-items: center; }
 .scene-header { justify-content: space-between; gap: 20px; }
 .scene-brand { gap: 12px; }
@@ -21,15 +21,31 @@
 .render-status dt { font-size: 10px; color: #6b745d; }
 .render-status dd { margin: 7px 0 0; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+.city-data { align-self: start; width: 350px; min-height: 0; max-width: 100%; max-height: 100%; overflow: auto; overscroll-behavior: contain; pointer-events: auto; border: 1px solid #d9ddcd; border-radius: 12px; background: #f8f9f0f5; scrollbar-width: thin; }
+.city-data summary { position: sticky; top: 0; padding: 14px 16px; background: #f8f9f0; font-size: 12px; font-weight: 650; cursor: pointer; }
+.city-data summary:focus-visible { outline: 2px solid #648452; outline-offset: -4px; border-radius: 10px; }
+.city-data summary small { display: block; margin-top: 7px; color: #65715c; font-size: 11px; font-weight: 400; }
+.city-data-body { padding: 0 16px 14px; }
+.city-size, .city-districts, .city-coordinate-note { margin: 0; color: #647157; font-size: 10px; line-height: 1.7; }
+.city-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 8px; margin: 15px 0; }
+.city-metrics dt { color: #6b745d; font-size: 10px; }
+.city-metrics dd { margin: 5px 0 0; font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.city-data h2 { display: flex; justify-content: space-between; margin: 17px 0 5px; font-size: 11px; }
+.city-data h2 span { color: #6b745d; font-size: 10px; font-weight: 400; }
+.city-landmarks { margin: 8px 0 0; padding: 0; list-style: none; }
+.city-landmarks li { display: grid; grid-template-columns: 27px minmax(0, 1fr) auto; align-items: baseline; gap: 5px; padding: 9px 0; border-top: 1px solid #e1e5d9; font-size: 11px; }
+.city-point-kind { color: #718060; font-size: 9px; }
+.city-landmarks code { font-size: 10px; color: #5d6b50; white-space: nowrap; }
+
 @media (max-width: 900px) {
-  .scene-overlay { padding: 22px; }
+  .scene-overlay { padding: 22px; gap: 18px; }
   .scene-footer { align-items: flex-start; flex-direction: column; gap: 16px; }
   .render-status { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
   .render-status dl { gap: 22px; }
 }
 
 @media (max-width: 480px) {
-  .scene-overlay { padding: 16px; }
+  .scene-overlay { padding: 16px; gap: 16px; }
   .scene-brand { gap: 8px; }
   .brand-icon { width: 37px; height: 37px; border-radius: 10px; }
   .scene-brand h1 { font-size: 21px; }
@@ -43,7 +59,7 @@
 }
 
 @media (max-height: 440px) {
-  .scene-overlay { padding: 14px 20px; }
+  .scene-overlay { padding: 14px 20px; gap: 14px; }
   .scene-caption { display: none; }
   .render-status { padding: 10px 14px; flex-direction: row; align-items: center; gap: 22px; }
   .render-status dl { gap: 18px; }
