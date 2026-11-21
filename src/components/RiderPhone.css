@@ -29,7 +29,7 @@
 
 .rider-phone[data-open="true"] {
   width: 330px;
-  height: min(600px, 80dvh, calc(100dvh - 92px));
+  height: min(600px, 78dvh, calc(100dvh - 148px));
   border-radius: 30px;
 }
 

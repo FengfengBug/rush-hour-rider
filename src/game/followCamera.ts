@@ -23,6 +23,7 @@ export class FollowCamera {
   private readonly offset = new Vector3()
   private readonly springTerm = new Vector3()
   private readonly ray = new Ray()
+  private readonly lookAtPoint = new Vector3()
   private mode: RideCameraMode = 'near'
   private heading = 0
   private initialized = false
@@ -56,7 +57,14 @@ export class FollowCamera {
     this.initialized = true
   }
 
-  update(position: Point2, heading: number, deltaSeconds: number): void {
+  update(
+    position: Point2,
+    heading: number,
+    deltaSeconds: number,
+    distraction = 0,
+    distractionTime = 0,
+    reducedMotion = false,
+  ): void {
     if (!this.initialized) {
       this.reset(position, heading)
       return
@@ -70,7 +78,18 @@ export class FollowCamera {
     this.spring(this.lookTarget, this.lookVelocity, this.lookGoal, 11, dt)
     if (this.shortenSegment(this.camera.position)) this.positionVelocity.set(0, 0, 0)
     if (this.shortenSegment(this.lookTarget)) this.lookVelocity.set(0, 0, 0)
-    this.camera.lookAt(this.lookTarget)
+    this.lookAtPoint.copy(this.lookTarget)
+    if (distraction > 0.01 && !reducedMotion) {
+      const sway = Math.sin(distractionTime * 2.1) * 0.16 * distraction
+      const bob = Math.cos(distractionTime * 3.4) * 0.045 * distraction
+      this.lookAtPoint.x += Math.cos(this.heading) * sway
+      this.lookAtPoint.z -= Math.sin(this.heading) * sway
+      this.lookAtPoint.y += bob
+    }
+    this.camera.lookAt(this.lookAtPoint)
+    if (distraction > 0.01 && !reducedMotion) {
+      this.camera.rotateZ(Math.sin(distractionTime * 2.6) * 0.014 * distraction)
+    }
     this.camera.updateMatrixWorld()
   }
 

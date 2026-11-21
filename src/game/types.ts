@@ -24,6 +24,7 @@ export interface RiderSnapshot {
   heading: number
   speed: number
   battery: number
+  stamina: number
   distance: number
   braking: boolean
   boosting: boolean
@@ -280,10 +281,29 @@ export interface OrderSnapshot {
   notice: string
 }
 
+export interface ShiftSnapshot {
+  durationSec: number
+  elapsedSec: number
+  remainingSec: number
+  clockLabel: string
+  ended: boolean
+}
+
+export interface DistractionSnapshot {
+  phoneOpen: boolean
+  active: boolean
+  level: number
+  elapsedSec: number
+  warningCount: number
+}
+
 export interface EngineSnapshot {
   view: CityView
   cameraMode: RideCameraMode
   riderPreview: RiderPreviewMode
+  muted: boolean
+  shift: ShiftSnapshot
+  distraction: DistractionSnapshot
   rider: RiderSnapshot
   traffic: TrafficSnapshot
   navigation: NavigationSnapshot

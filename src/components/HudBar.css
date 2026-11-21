@@ -1,0 +1,574 @@
+.hud-top-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+  z-index: 25;
+  pointer-events: none;
+}
+
+.hud-bar,
+.hud-bar * {
+  box-sizing: border-box;
+}
+
+.hud-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid #d5d9c9;
+  border-radius: 14px;
+  color: #2f3b2f;
+  background: rgba(252, 248, 239, 0.94);
+  box-shadow: 0 6px 20px rgba(26, 36, 28, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(8px);
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+}
+
+.hud-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.hud-brand-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: #2c3128;
+  background: linear-gradient(135deg, #ffe285, #f4be41);
+  box-shadow: inset 0 0 0 1px rgba(154, 118, 28, 0.25);
+}
+
+.hud-brand-copy h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 850;
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+}
+
+.hud-brand-copy p {
+  margin: 2px 0 0;
+  color: #66705c;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.hud-metrics {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 0;
+}
+
+.hud-metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 2px 9px;
+  border-left: 1px solid #e2e5d7;
+}
+
+.hud-metric--clock {
+  min-width: 132px;
+  padding: 4px 10px;
+  border: 1px solid #dde1d0;
+  border-radius: 9px;
+  background: #f5f2e6;
+}
+
+.hud-metric--clock[data-urgent="true"] {
+  border-color: #dfada2;
+  background: #fdf0ec;
+}
+
+.hud-metric--clock[data-ended="true"] {
+  border-color: #3d4a3d;
+  color: #fff6d9;
+  background: #2f3a30;
+}
+
+.hud-clock-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1.2;
+}
+
+.hud-clock-time {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.hud-clock-rem {
+  margin-left: auto;
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: #55624d;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hud-metric--clock[data-urgent="true"] .hud-clock-time,
+.hud-metric--clock[data-urgent="true"] .hud-clock-rem {
+  color: #b33a35;
+}
+
+.hud-metric--clock[data-ended="true"] .hud-clock-rem {
+  color: #2f3a30;
+  background: #ffd461;
+}
+
+.hud-progress-track {
+  height: 3px;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(105, 117, 94, 0.2);
+}
+
+.hud-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d79a2b, #e06b3d);
+  transition: width 150ms linear;
+}
+
+.hud-metric--clock[data-urgent="true"] .hud-progress-track > span {
+  background: #c5443a;
+}
+
+.hud-label {
+  color: #6b7460;
+  font-size: 10px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.hud-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.hud-value small {
+  color: #68725e;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.hud-value--money {
+  color: #8b5418;
+}
+
+.hud-metric--ontime[data-low="true"] .hud-value {
+  color: #b33a35;
+}
+
+.hud-active-pill {
+  margin-left: 3px;
+  padding: 0 5px;
+  border-radius: 99px;
+  color: #365f44;
+  background: #e6f0e0;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.hud-meter {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 96px;
+  padding: 2px 0 2px 9px;
+  border-left: 1px solid #e2e5d7;
+}
+
+.hud-meter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.hud-meter-head > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #606a56;
+  white-space: nowrap;
+}
+
+.hud-meter-head strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.hud-meter-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #e3e6d8;
+}
+
+.hud-meter-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 140ms linear;
+}
+
+.hud-meter[data-kind="battery"] .hud-meter-track > span {
+  background: #5f8f59;
+}
+
+.hud-meter[data-kind="stamina"] .hud-meter-track > span {
+  background: #3e8286;
+}
+
+.hud-meter[data-low="true"] .hud-meter-head,
+.hud-meter[data-low="true"] .hud-meter-head > span,
+.hud-meter[data-low="true"] .hud-meter-head strong {
+  color: #b33a35;
+}
+
+.hud-meter[data-low="true"] .hud-meter-track {
+  background: #f2dcd5;
+}
+
+.hud-meter[data-low="true"] .hud-meter-track > span {
+  background: #c84c3d;
+}
+
+.hud-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.hud-bar .hud-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 1px solid #d4d8c8;
+  border-radius: 8px;
+  color: #3c4b3a;
+  background: #f6f3e8;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.hud-bar .hud-action-btn:hover:not(:disabled) {
+  border-color: #b49342;
+  background: #f8ebc6;
+}
+
+.hud-bar .hud-action-btn[aria-pressed="true"] {
+  border-color: #c79a8e;
+  color: #8f352f;
+  background: #f8e3de;
+}
+
+.hud-bar .hud-action-btn:focus-visible {
+  outline: 2px solid #2b6451;
+  outline-offset: 2px;
+}
+
+.hud-alert-slot {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(560px, calc(100vw - 44px));
+  pointer-events: none;
+}
+
+.distraction-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 15px;
+  border: 1px solid rgba(255, 224, 214, 0.55);
+  border-radius: 12px;
+  color: #fff9f5;
+  background: linear-gradient(125deg, rgba(177, 46, 42, 0.94), rgba(145, 34, 34, 0.94));
+  box-shadow: 0 10px 26px rgba(130, 26, 26, 0.34), 0 0 0 3px rgba(196, 56, 48, 0.24);
+  animation: hud-alert-pulse 1.3s ease-in-out infinite;
+}
+
+.distraction-alert-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: #ffe384;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.distraction-alert-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.distraction-alert-copy strong {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+}
+
+.distraction-alert-copy span {
+  color: #ffdfd8;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.distraction-alert-copy kbd {
+  padding: 0 4px;
+  border: 1px solid rgba(255, 232, 220, 0.45);
+  border-radius: 4px;
+  color: #fffaf5;
+  background: rgba(0, 0, 0, 0.2);
+  font: inherit;
+  font-weight: 700;
+}
+
+.shift-ended-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid #485847;
+  border-radius: 13px;
+  color: #fff8e2;
+  background: rgba(37, 48, 39, 0.95);
+  box-shadow: 0 12px 30px rgba(18, 26, 20, 0.32);
+  pointer-events: auto;
+}
+
+.shift-ended-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: #2b3127;
+  background: #ffd35c;
+}
+
+.shift-ended-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.shift-ended-copy strong {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.shift-ended-copy span {
+  color: #d7dfca;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.shift-ended-banner .shift-ended-restart {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid #e4ba4f;
+  border-radius: 8px;
+  color: #2f2a1b;
+  background: #ffd564;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.shift-ended-banner .shift-ended-restart:hover {
+  background: #ffc942;
+}
+
+@keyframes hud-alert-pulse {
+  0%, 100% {
+    box-shadow: 0 10px 26px rgba(130, 26, 26, 0.34), 0 0 0 2px rgba(214, 62, 54, 0.25);
+  }
+  50% {
+    box-shadow: 0 10px 28px rgba(130, 26, 26, 0.42), 0 0 0 5px rgba(214, 62, 54, 0.38);
+  }
+}
+
+@media (max-width: 1180px) {
+  .hud-brand-copy p {
+    display: none;
+  }
+
+  .hud-metrics {
+    gap: 5px 7px;
+  }
+
+  .hud-metric {
+    padding: 2px 7px;
+  }
+
+  .hud-meter {
+    width: 82px;
+    padding-left: 7px;
+  }
+}
+
+@media (max-width: 860px) {
+  .hud-bar {
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 6px 8px;
+  }
+
+  .hud-metrics {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding-top: 4px;
+    border-top: 1px solid #e3e6d9;
+  }
+
+  .hud-metric--clock {
+    min-width: 118px;
+  }
+}
+
+@media (max-width: 600px), (max-height: 500px) {
+  .hud-bar {
+    gap: 5px 6px;
+    padding: 5px 7px;
+    border-radius: 10px;
+  }
+
+  .hud-brand-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+  }
+
+  .hud-brand-icon svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .hud-brand-copy h1 {
+    font-size: 14px;
+  }
+
+  .hud-metrics {
+    gap: 4px 6px;
+  }
+
+  .hud-metric {
+    padding: 1px 5px;
+  }
+
+  .hud-metric--clock {
+    min-width: 106px;
+    padding: 2px 6px;
+  }
+
+  .hud-clock-time {
+    font-size: 13px;
+  }
+
+  .hud-value {
+    font-size: 13px;
+  }
+
+  .hud-active-pill {
+    display: none;
+  }
+
+  .hud-meter {
+    width: 70px;
+    padding-left: 5px;
+  }
+
+  .hud-bar .hud-action-btn {
+    min-height: 28px;
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+
+  .distraction-alert {
+    padding: 7px 10px;
+    gap: 7px;
+  }
+
+  .distraction-alert-copy strong {
+    font-size: 12px;
+  }
+
+  .distraction-alert-copy span {
+    font-size: 10px;
+  }
+
+  .shift-ended-banner {
+    flex-wrap: wrap;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .distraction-alert {
+    animation: none;
+  }
+
+  .hud-progress-track > span,
+  .hud-meter-track > span {
+    transition: none;
+  }
+}

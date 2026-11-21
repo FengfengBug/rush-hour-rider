@@ -9,6 +9,9 @@ export interface DrivingInput {
   steering: number
   brake: boolean
   boost: boolean
+  distraction?: number
+  distractionTime?: number
+  activeOrderCount?: number
 }
 
 export interface RiderState extends RiderSnapshot {
@@ -40,7 +43,7 @@ export class RiderController {
     this.state = {
       x: this.spawn.position.x, z: this.spawn.position.z, heading: FACING[this.spawn.facing],
       speed: 0, velocityX: 0, velocityZ: 0, steeringAngle: 0, leanAngle: 0,
-      wheelTravel: 0, distance: 0, battery: 100, braking: false, boosting: false, colliding: false,
+      wheelTravel: 0, distance: 0, battery: 100, stamina: 100, braking: false, boosting: false, colliding: false,
     }
   }
 
@@ -48,8 +51,12 @@ export class RiderController {
     this.stop()
     Object.assign(this.state, {
       x: this.spawn.position.x, z: this.spawn.position.z, heading: FACING[this.spawn.facing],
-      wheelTravel: 0, distance: 0, battery: 100,
+      wheelTravel: 0, distance: 0, battery: 100, stamina: 100,
     })
+  }
+
+  consumeStamina(amount: number) {
+    this.state.stamina = Math.max(0, Math.min(100, this.state.stamina - amount))
   }
 
   stop() {
@@ -66,7 +73,7 @@ export class RiderController {
     for (let step = 0; step < steps; step += 1) this.step(deltaSeconds / steps, input)
   }
 
-  applyTrafficImpact(normalX: number, normalZ: number, distance: number) {
+  applyTrafficImpact(normalX: number, normalZ: number, distance: number, distraction = 0) {
     const state = this.state
     const incomingSpeed = state.velocityX * normalX + state.velocityZ * normalZ
     state.velocityX *= 0.4
@@ -83,12 +90,16 @@ export class RiderController {
     state.wheelTravel += (state.x - oldX) * Math.sin(state.heading) + (state.z - oldZ) * Math.cos(state.heading)
     const forwardSpeed = state.velocityX * Math.sin(state.heading) + state.velocityZ * Math.cos(state.heading)
     state.speed = Math.hypot(state.velocityX, state.velocityZ) * (forwardSpeed < 0 ? -1 : 1)
+    state.stamina = Math.max(0, state.stamina - (4.5 + 2.5 * distraction))
     state.boosting = false
     state.colliding = true
   }
 
   private step(dt: number, input: DrivingInput) {
     const state = this.state
+    const distraction = Math.max(0, Math.min(1, input.distraction ?? 0))
+    const distractionTime = input.distractionTime ?? 0
+    const activeOrders = Math.max(0, input.activeOrderCount ?? 0)
     let speed = state.velocityX * Math.sin(state.heading) + state.velocityZ * Math.cos(state.heading)
     const reversing = input.throttle * speed < -0.1
     const boost = input.boost && input.throttle > 0 && speed >= 0 && state.battery > 0 && !input.brake
@@ -103,8 +114,13 @@ export class RiderController {
       speed = approach(speed, 0, (1.1 + Math.abs(speed) * 0.12) * dt)
     }
 
-    const steeringTarget = input.steering * 0.5 / (1 + Math.abs(speed) * 0.18)
-    state.steeringAngle += (steeringTarget - state.steeringAngle) * (1 - Math.exp(-9 * dt))
+    const steeringScale = 1 - 0.42 * distraction
+    const steeringResponse = 9 - 4.8 * distraction
+    const driftBias = distraction > 0 && Math.abs(speed) > 1.2
+      ? Math.sin(distractionTime * 2.2) * 0.055 * distraction * Math.min(1, Math.abs(speed) / 8)
+      : 0
+    const steeringTarget = (input.steering * 0.5 * steeringScale + driftBias) / (1 + Math.abs(speed) * 0.18)
+    state.steeringAngle += (steeringTarget - state.steeringAngle) * (1 - Math.exp(-steeringResponse * dt))
     const yawRate = speed * Math.tan(state.steeringAngle) / 1.6
     state.heading += yawRate * dt
     state.heading = Math.atan2(Math.sin(state.heading), Math.cos(state.heading))
@@ -137,6 +153,12 @@ export class RiderController {
     state.battery = Math.max(0, state.battery - travelled * (boost ? 0.08 : 0.025))
     const forwardSpeed = state.velocityX * forwardX + state.velocityZ * forwardZ
     state.speed = Math.hypot(state.velocityX, state.velocityZ) * (forwardSpeed < 0 ? -1 : 1)
+    if (travelled > 0.0001) {
+      const effortRate = 0.12 + activeOrders * 0.05 + (state.boosting ? 0.55 : 0)
+      state.stamina = Math.max(0, state.stamina - effortRate * dt)
+    } else if (Math.abs(state.speed) < 0.15 && !state.colliding) {
+      state.stamina = Math.min(100, state.stamina + 1.8 * dt)
+    }
     const targetLean = Math.max(-0.35, Math.min(0.35, -Math.atan(state.speed * yawRate / 9.81) * 0.55))
     state.leanAngle += (targetLean - state.leanAngle) * (1 - Math.exp(-8 * dt))
   }

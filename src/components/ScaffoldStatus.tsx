@@ -1,6 +1,7 @@
-import { Bike, Sun } from 'lucide-react'
+import { Sun } from 'lucide-react'
 import { CITY_LAYOUT } from '../game/cityLayout'
 import { NAVIGATION_COLORS } from '../game/navigationSystem'
+import { HudBar } from './HudBar'
 import { MiniMap } from './MiniMap'
 import type { GameEngine } from '../game/gameEngine'
 import type { CityView, EngineSnapshot, NavigationKind, RideCameraMode, RiderPreviewMode } from '../game/types'
@@ -41,15 +42,18 @@ const navigationKinds: { kind: NavigationKind; label: string }[] = [
 interface ScaffoldStatusProps {
   engine: GameEngine | null
   snapshot: EngineSnapshot | null
+  muted: boolean
   onNavigationTargetChange: (id: string | null) => void
   onViewChange: (view: CityView) => void
   onRiderPreviewChange: (mode: RiderPreviewMode) => void
   onCameraChange: (mode: RideCameraMode) => void
+  onCycleCamera: () => void
+  onToggleMute: () => void
   onResetRider: () => void
 }
 
 export function ScaffoldStatus({
-  engine, snapshot, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onResetRider,
+  engine, snapshot, muted, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onCycleCamera, onToggleMute, onResetRider,
 }: ScaffoldStatusProps) {
   const view = snapshot?.view ?? 'ride'
   const cameraMode = snapshot?.cameraMode ?? 'near'
@@ -73,16 +77,13 @@ export function ScaffoldStatus({
 
   return (
     <div className="scene-overlay">
-      <header className="scene-header">
-        <div className="scene-brand">
-          <span className="brand-icon"><Bike size={24} aria-hidden="true" /></span>
-          <div>
-            <h1>午高峰</h1>
-            <p>RUSH HOUR RIDER</p>
-          </div>
-        </div>
-        <span className="task-badge">TASK 2.3 / 拟真骑手手机</span>
-      </header>
+      <HudBar
+        snapshot={snapshot}
+        muted={muted}
+        onCycleCamera={onCycleCamera}
+        onToggleMute={onToggleMute}
+        onResetRider={onResetRider}
+      />
 
       <div className="scene-controls">
         <section className="navigation-panel" aria-label="订单导航" style={{ borderTopColor: selectedTarget ? NAVIGATION_COLORS[selectedTarget.kind] : undefined }}>
@@ -193,12 +194,15 @@ export function ScaffoldStatus({
           <dl className="ride-telemetry">
             <div><dt>累计里程</dt><dd>{rider ? `${rider.distance.toFixed(1)} m` : '—'}</dd></div>
             <div><dt>位置 (X, Z) · 米</dt><dd>{rider ? `(${rider.x.toFixed(1)}, ${rider.z.toFixed(1)})` : '—'}</dd></div>
+            <div><dt>骑手体力</dt><dd>{rider ? `${rider.stamina.toFixed(1)}%` : '—'}</dd></div>
+            <div><dt>边骑看屏累计</dt><dd>{snapshot ? `${snapshot.distraction.elapsedSec.toFixed(1)} s (${snapshot.distraction.warningCount} 次)` : '—'}</dd></div>
           </dl>
 
           <div className="drive-status" role="group" aria-label="车辆状态">
             <span data-active={rider?.boosting ?? false}>{rider ? rider.boosting ? '助推中' : '助推待机' : '助推 —'}</span>
             <span data-active={rider?.braking ?? false}>{rider ? rider.braking ? '制动中' : '未刹车' : '刹车 —'}</span>
             <span className="contact-status" data-active={rider?.colliding ?? false}>{rider ? rider.colliding ? '碰撞接触' : '无碰撞接触' : '碰撞 —'}</span>
+            <span className="contact-status" data-active={snapshot?.distraction.active ?? false}>{snapshot ? snapshot.distraction.active ? '低头看屏风险' : '视野清晰' : '看屏 —'}</span>
             <span data-active={traffic?.hornActive ?? false} role="status">{traffic ? traffic.hornActive ? '鸣笛波纹中' : '鸣笛待机' : '鸣笛 —'}</span>
           </div>
 
@@ -324,7 +328,7 @@ export function ScaffoldStatus({
       <footer className="scene-footer">
         <div className="scene-caption">
           <h2><Sun size={14} aria-hidden="true" />看清方向，再出发。</h2>
-          <p>三单并送 · 实际耗时入账</p>
+          <p>午高峰 11:30–13:30 · 低头看屏请先减速</p>
         </div>
         <div className="engine-summary">
           <span className="engine-state" data-ready={snapshot !== null}>{snapshot ? '引擎运行中' : '正在初始化'}</span>

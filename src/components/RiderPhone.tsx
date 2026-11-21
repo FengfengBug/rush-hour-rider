@@ -10,6 +10,8 @@ import './RiderPhone.css'
 interface RiderPhoneProps {
   engine: GameEngine | null
   snapshot: EngineSnapshot | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
 type PhoneTab = 'lobby' | 'active' | 'wallet'
@@ -86,8 +88,7 @@ function ReportForm({ order, unavailable, onReport }: {
   )
 }
 
-export function RiderPhone({ engine, snapshot }: RiderPhoneProps) {
-  const [open, setOpen] = useState(false)
+export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneProps) {
   const [tab, setTab] = useState<PhoneTab>('lobby')
   const [seenOfferIds, setSeenOfferIds] = useState<ReadonlySet<string>>(() => new Set())
   const [actionError, setActionError] = useState<{ text: string; notice: string } | null>(null)
@@ -97,6 +98,7 @@ export function RiderPhone({ engine, snapshot }: RiderPhoneProps) {
   const focusCloseOnOpen = useRef(false)
   const panelId = useId()
   const orders = snapshot?.orders
+  const shiftEnded = snapshot?.shift.ended ?? false
   const elapsed = orders?.elapsedSec ?? 0
   const active = orders?.active ?? []
   const offers = orders?.offers ?? []
@@ -119,10 +121,10 @@ export function RiderPhone({ engine, snapshot }: RiderPhoneProps) {
   const notice = actionError?.notice === (orders?.notice ?? '') ? actionError.text : orders?.notice
 
   const closePhone = useCallback(() => {
-    setOpen(false)
+    onOpenChange(false)
     focusCloseOnOpen.current = false
     engine?.focusCanvas()
-  }, [engine])
+  }, [engine, onOpenChange])
 
   useEffect(() => {
     if (open && focusCloseOnOpen.current) {
@@ -147,14 +149,14 @@ export function RiderPhone({ engine, snapshot }: RiderPhoneProps) {
       event.preventDefault()
       if (open) closePhone()
       else {
-        setOpen(true)
+        onOpenChange(true)
         // Do not move focus into the phone when opening from the canvas: W and a second Tab still work.
         if (collapsedToggle) engine?.focusCanvas()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, engine, closePhone])
+  }, [open, engine, closePhone, onOpenChange])
 
   function accept(id: string) {
     if (!engine || !orders || orders.paused || full) return
@@ -195,7 +197,7 @@ export function RiderPhone({ engine, snapshot }: RiderPhoneProps) {
       {!open ? (
         <button className="rider-phone-peek" ref={toggleRef} type="button" aria-expanded={false} aria-controls={panelId} onClick={() => {
           focusCloseOnOpen.current = true
-          setOpen(true)
+          onOpenChange(true)
         }}>
           <span className="rider-phone-peek-heading">
             <span className="rider-phone-peek-brand"><Zap size={16} aria-hidden="true" />极速达</span>
@@ -217,7 +219,7 @@ export function RiderPhone({ engine, snapshot }: RiderPhoneProps) {
           <div className="rider-phone-top">
             <div className="rider-phone-hardware" aria-hidden="true"><i /><b /></div>
             <div className="rider-phone-statusbar">
-              <span>游玩 <strong>{orders ? elapsedTime(elapsed) : '—'}</strong></span>
+              <span title={orders ? `本班实玩 ${elapsedTime(elapsed)}` : undefined}>午高峰 <strong>{snapshot?.shift.clockLabel ?? '11:30'}</strong></span>
               <span className="rider-phone-status-icons">
                 <span className="rider-phone-signal" title="本地离线模拟" role="img" aria-label="本地离线模拟"><Signal size={14} aria-hidden="true" /></span>
                 <span className="rider-phone-vehicle-battery" data-low={!!snapshot && snapshot.rider.battery < 20}>
@@ -238,7 +240,13 @@ export function RiderPhone({ engine, snapshot }: RiderPhoneProps) {
             if (event.target === event.currentTarget && event.key !== 'Tab' && event.key !== 'Escape') event.stopPropagation()
           }}>
             <p className="rider-phone-notice" role="status" aria-live="polite" aria-atomic="true">{notice || (orders ? '接单后跟随光柱，进入地点范围自动取送。' : '正在等待本地订单数据。')}</p>
-            {orders?.paused && <p className="rider-phone-warning">已暂停 · 派单与计时冻结，返回骑行后可接单、导航和报备。</p>}
+            {orders?.paused && (
+              <p className="rider-phone-warning">
+                {shiftEnded
+                  ? '13:30 午高峰班次已结束，点击顶部“重新开工”可开启新班次。'
+                  : '已暂停 · 派单与计时冻结，返回骑行后可接单、导航和报备。'}
+              </p>
+            )}
 
             {tab === 'lobby' && (
               <section aria-label="待抢订单">

@@ -32,8 +32,21 @@ const DISTRICT_FOCUS = {
   'civic-center': 'south-community-hospital',
 } as const
 const VIEW_ANGLE: Record<Direction, number> = { south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 }
+export const SHIFT_DURATION_SECONDS = 210
+const SHIFT_START_MINUTES = 11 * 60 + 30
+const SHIFT_SPAN_MINUTES = 120
+const DISTRACTION_SAFE_SPEED = 0.8
+const DISTRACTION_FULL_SPEED = 9.0
 const CAMERA_MODES: RideCameraMode[] = ['near', 'far', 'overhead']
 const DRIVING_KEYS = new Set(['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'ShiftLeft', 'ShiftRight'])
+
+function formatShiftClock(elapsedSeconds: number): string {
+  const ratio = Math.max(0, Math.min(1, elapsedSeconds / SHIFT_DURATION_SECONDS))
+  const totalMinutes = SHIFT_START_MINUTES + Math.floor(ratio * SHIFT_SPAN_MINUTES)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
 
 export class GameEngine {
   private readonly container: HTMLElement
@@ -61,6 +74,16 @@ export class GameEngine {
   private view: CityView = 'ride'
   private cameraMode: RideCameraMode = 'near'
   private riderPreview: RiderPreviewMode = 'parked'
+  private muted = false
+  private phoneOpen = false
+  private shiftElapsed = 0
+  private shiftEnded = false
+  private distractionLevel = 0
+  private distractionActive = false
+  private distractionPhaseTime = 0
+  private distractedElapsedSec = 0
+  private distractionWarningCount = 0
+  private readonly reducedMotionQuery: MediaQueryList | null
   private previewTime = 0
   private wheelAngle = 0
   private collisionDisplayTime = 0
@@ -76,6 +99,7 @@ export class GameEngine {
   constructor(container: HTMLElement, onSnapshot: (snapshot: EngineSnapshot) => void) {
     this.container = container
     this.onSnapshot = onSnapshot
+    this.reducedMotionQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null
     this.renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
     this.renderer.outputColorSpace = SRGBColorSpace
     this.renderer.toneMapping = ACESFilmicToneMapping
@@ -187,7 +211,27 @@ export class GameEngine {
     this.cameraMode = mode
     this.followCamera.setMode(mode)
     if (this.view !== 'ride') this.setCityView('ride')
+    this.lastSnapshotTime = 0
     this.focusCanvas()
+  }
+
+  cycleRideCameraMode() {
+    this.setRideCameraMode(CAMERA_MODES[(CAMERA_MODES.indexOf(this.cameraMode) + 1) % CAMERA_MODES.length])
+  }
+
+  setMuted(muted: boolean) {
+    if (this.muted === muted) return
+    this.muted = muted
+    this.lastSnapshotTime = 0
+  }
+
+  setPhoneOpen(open: boolean) {
+    if (this.phoneOpen === open) return
+    this.phoneOpen = open
+    if (!open) {
+      this.distractionActive = false
+    }
+    this.lastSnapshotTime = 0
   }
 
   setNavigationTarget(id: string | null) {
@@ -200,19 +244,19 @@ export class GameEngine {
   }
 
   acceptOrder(id: string) {
-    if (this.view !== 'ride' || document.hidden || !this.orders.accept(id, this.controller.state)) return false
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded || !this.orders.accept(id, this.controller.state)) return false
     this.syncOrderNavigation()
     this.focusCanvas()
     return true
   }
 
   prioritizeOrder(id: string) {
-    if (this.view !== 'ride' || document.hidden || !this.orders.prioritize(id)) return
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded || !this.orders.prioritize(id)) return
     this.setNavigationTarget(this.orders.priorityTargetId)
   }
 
   reportOrder(id: string, reason: OrderReportReason) {
-    if (this.view !== 'ride' || document.hidden || !this.orders.report(id, reason)) return false
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded || !this.orders.report(id, reason)) return false
     this.lastSnapshotTime = 0
     return true
   }
@@ -245,7 +289,15 @@ export class GameEngine {
     this.traffic.reset()
     this.trafficVisuals.update(0)
     this.collisionDisplayTime = 0
+    this.shiftElapsed = 0
+    this.shiftEnded = false
+    this.distractionLevel = 0
+    this.distractionActive = false
+    this.distractionPhaseTime = 0
+    this.distractedElapsedSec = 0
+    this.distractionWarningCount = 0
     this.setCityView('ride')
+    this.lastSnapshotTime = 0
   }
 
   setRiderPreviewMode(mode: RiderPreviewMode) {
@@ -312,14 +364,14 @@ export class GameEngine {
     if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, button, a, summary, [contenteditable="true"]')) return
     if (event.code === 'KeyC') {
       event.preventDefault()
-      if (!event.repeat) this.setRideCameraMode(CAMERA_MODES[(CAMERA_MODES.indexOf(this.cameraMode) + 1) % CAMERA_MODES.length])
-    } else if (this.view === 'ride' && event.code === 'KeyH') {
+      if (!event.repeat) this.cycleRideCameraMode()
+    } else if (this.view === 'ride' && !this.shiftEnded && event.code === 'KeyH') {
       event.preventDefault()
       if (!event.repeat && this.hornRemaining <= 0) {
         this.hornRemaining = 0.7
         this.trafficVisuals.honk(this.controller.state, this.controller.state.heading)
       }
-    } else if (this.view === 'ride' && DRIVING_KEYS.has(event.code)) {
+    } else if (this.view === 'ride' && !this.shiftEnded && DRIVING_KEYS.has(event.code)) {
       if (!event.code.startsWith('Shift')) event.preventDefault()
       this.keys.add(event.code)
     }
@@ -358,39 +410,87 @@ export class GameEngine {
   private readonly tick = (time: number) => {
     const deltaSeconds = Math.max(0, Math.min((time - this.previousTime) / 1000, 0.05))
     this.previousTime = time
-    if (this.view === 'ride' && !document.hidden) {
+    const shiftActive = this.view === 'ride' && !document.hidden && !this.shiftEnded
+    if (shiftActive) {
+      const stepSeconds = Math.min(deltaSeconds, Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed))
+      this.shiftElapsed += stepSeconds
       const previousPosition = { x: this.controller.state.x, z: this.controller.state.z }
-      this.traffic.update(deltaSeconds, this.controller.state)
-      this.hornRemaining = Math.max(0, this.hornRemaining - deltaSeconds)
-      this.trafficVisuals.update(deltaSeconds)
+      const speedAbs = Math.abs(this.controller.state.speed)
+      const isRisky = this.phoneOpen && speedAbs >= DISTRACTION_SAFE_SPEED
+      if (isRisky && !this.distractionActive) {
+        this.distractionWarningCount += 1
+        this.lastSnapshotTime = 0
+      } else if (!isRisky && this.distractionActive) {
+        this.lastSnapshotTime = 0
+      }
+      this.distractionActive = isRisky
+      const targetDistraction = isRisky
+        ? Math.max(0.28, Math.min(1, (speedAbs - DISTRACTION_SAFE_SPEED) / (DISTRACTION_FULL_SPEED - DISTRACTION_SAFE_SPEED)))
+        : 0
+      const distractionRate = isRisky ? 5.5 : 10
+      this.distractionLevel += (targetDistraction - this.distractionLevel) * (1 - Math.exp(-distractionRate * stepSeconds))
+      if (this.distractionLevel < 0.005) this.distractionLevel = 0
+      if (isRisky) {
+        this.distractionPhaseTime += stepSeconds
+        this.distractedElapsedSec += stepSeconds
+      }
+
+      this.traffic.update(stepSeconds, this.controller.state, this.distractionLevel)
+      this.hornRemaining = Math.max(0, this.hornRemaining - stepSeconds)
+      this.trafficVisuals.update(stepSeconds)
       const forward = this.keys.has('KeyW') || this.keys.has('ArrowUp')
       const reverse = this.keys.has('KeyS') || this.keys.has('ArrowDown')
-      this.controller.update(deltaSeconds, {
+      this.controller.update(stepSeconds, {
         throttle: Number(forward) - Number(reverse),
         steering: Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft')) - Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')),
         brake: this.keys.has('Space') || forward && reverse,
         boost: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
+        distraction: this.distractionLevel,
+        distractionTime: this.distractionPhaseTime,
+        activeOrderCount: this.orders.activeTargetIds.length,
       })
       const state = this.controller.state
-      const impact = this.traffic.checkCollision(state)
-      if (impact) this.controller.applyTrafficImpact(impact.normalX, impact.normalZ, impact.distance)
+      const impact = this.traffic.checkCollision(state, this.distractionLevel)
+      if (impact) this.controller.applyTrafficImpact(impact.normalX, impact.normalZ, impact.distance, this.distractionLevel)
       this.traffic.checkSignals(previousPosition, state)
       const orderRevision = this.orders.revision
-      this.orders.update(deltaSeconds, previousPosition, state, this.traffic.isWaitingAtRedLight(state))
+      this.orders.update(stepSeconds, previousPosition, state, this.traffic.isWaitingAtRedLight(state))
       if (orderRevision !== this.orders.revision) this.syncOrderNavigation()
-      this.navigationElapsed += deltaSeconds
+      this.navigationElapsed += stepSeconds
       if (this.navigationElapsed >= 0.1) {
         this.navigation.update(state)
         this.navigationElapsed %= 0.1
       }
-      this.collisionDisplayTime = state.colliding ? 0.35 : Math.max(0, this.collisionDisplayTime - deltaSeconds)
+      this.collisionDisplayTime = state.colliding ? 0.35 : Math.max(0, this.collisionDisplayTime - stepSeconds)
       this.updateRider()
-      this.dust.update(deltaSeconds, state, state.heading, state.speed, state.braking)
-      this.followCamera.update(state, state.heading, deltaSeconds)
+      this.dust.update(stepSeconds, state, state.heading, state.speed, state.braking)
+      this.followCamera.update(
+        state,
+        state.heading,
+        stepSeconds,
+        this.distractionLevel,
+        this.distractionPhaseTime,
+        this.reducedMotionQuery?.matches ?? false,
+      )
       this.sunlight.target.position.copy(this.rider.root.position)
       this.sunlight.position.copy(this.sunlight.target.position).add({ x: -240, y: 410, z: 220 })
       this.sunlight.shadow.needsUpdate = true
+      if (this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
+        this.shiftElapsed = SHIFT_DURATION_SECONDS
+        this.shiftEnded = true
+        this.distractionActive = false
+        this.distractionLevel = 0
+        this.clearInput()
+        this.updateRider()
+        this.lastSnapshotTime = 0
+      }
+    } else if (this.view === 'ride') {
+      this.distractionActive = false
+      this.distractionLevel = 0
+      this.followCamera.update(this.controller.state, this.controller.state.heading, deltaSeconds, 0, 0, true)
     } else {
+      this.distractionActive = false
+      this.distractionLevel = 0
       if (this.riderPreview === 'motion') {
         this.previewTime += deltaSeconds
         this.wheelAngle = (this.wheelAngle + deltaSeconds * 3.2 / RIDER_WHEEL_RADIUS) % (Math.PI * 2)
@@ -419,14 +519,29 @@ export class GameEngine {
         view: this.view,
         cameraMode: this.cameraMode,
         riderPreview: this.riderPreview,
+        muted: this.muted,
+        shift: {
+          durationSec: SHIFT_DURATION_SECONDS,
+          elapsedSec: this.shiftElapsed,
+          remainingSec: Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed),
+          clockLabel: formatShiftClock(this.shiftElapsed),
+          ended: this.shiftEnded,
+        },
+        distraction: {
+          phoneOpen: this.phoneOpen,
+          active: this.distractionActive,
+          level: this.distractionLevel,
+          elapsedSec: this.distractedElapsedSec,
+          warningCount: this.distractionWarningCount,
+        },
         rider: {
           x: state.x, z: state.z, heading: state.heading, speed: state.speed,
-          battery: state.battery, distance: state.distance, braking: state.braking,
+          battery: state.battery, stamina: state.stamina, distance: state.distance, braking: state.braking,
           boosting: state.boosting, colliding: this.collisionDisplayTime > 0,
         },
         traffic: this.traffic.getSnapshot(state, this.hornRemaining > 0),
         navigation: this.navigation.snapshot,
-        orders: this.orders.getSnapshot(state, this.view !== 'ride' || document.hidden),
+        orders: this.orders.getSnapshot(state, !shiftActive),
         fps: this.fps,
         drawCalls: this.renderer.info.render.calls,
         triangleCount: this.renderer.info.render.triangles,

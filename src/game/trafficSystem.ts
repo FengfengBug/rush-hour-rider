@@ -138,9 +138,10 @@ export class TrafficSystem {
     }
   }
 
-  update(deltaSeconds: number, rider?: Point2): void {
+  update(deltaSeconds: number, rider?: Point2, distraction = 0): void {
     this.frameStartedAt = this.elapsed
     const steps = Math.ceil(deltaSeconds * 60)
+    const clampedDistraction = Math.max(0, Math.min(1, distraction))
     for (let step = 0; step < steps; step += 1) {
       const dt = deltaSeconds / steps
       this.elapsed += dt
@@ -167,8 +168,9 @@ export class TrafficSystem {
           const dz = rider.z - vehicle.z
           const ahead = dx * Math.sin(vehicle.heading) + dz * Math.cos(vehicle.heading)
           const lateral = Math.abs(dx * Math.cos(vehicle.heading) - dz * Math.sin(vehicle.heading))
+          const yieldBuffer = 1 - clampedDistraction * 0.55
           if (ahead > 0 && lateral < vehicle.width / 2 + RIDER_TRAFFIC_RADIUS + 0.3) {
-            gap = Math.min(gap, Math.max(0, ahead - vehicle.length / 2 - RIDER_TRAFFIC_RADIUS - 1))
+            gap = Math.min(gap, Math.max(0, ahead - vehicle.length / 2 - RIDER_TRAFFIC_RADIUS - yieldBuffer))
           }
         }
         const targetSpeed = Math.min(vehicle.cruiseSpeed, Math.sqrt(2 * 5 * gap))
@@ -215,7 +217,8 @@ export class TrafficSystem {
     }
   }
 
-  checkCollision(rider: Point2): TrafficImpact | null {
+  checkCollision(rider: Point2, distraction = 0): TrafficImpact | null {
+    const contactRadius = RIDER_TRAFFIC_RADIUS + Math.max(0, Math.min(1, distraction)) * 0.32
     let impact: TrafficImpact | null = null
     for (const vehicle of this.vehicles) {
       const sin = Math.sin(vehicle.heading)
@@ -231,23 +234,23 @@ export class TrafficSystem {
       const offsetX = localX - nearestX
       const offsetZ = localZ - nearestZ
       const distance = Math.hypot(offsetX, offsetZ)
-      if (distance > RIDER_TRAFFIC_RADIUS + 0.8) this.contacts.delete(vehicle.id)
-      if (distance >= RIDER_TRAFFIC_RADIUS) continue
+      if (distance > contactRadius + 0.8) this.contacts.delete(vehicle.id)
+      if (distance >= contactRadius) continue
       let normalX: number
       let normalZ: number
       let depth: number
       if (distance > 0.00001) {
         normalX = offsetX / distance
         normalZ = offsetZ / distance
-        depth = RIDER_TRAFFIC_RADIUS - distance
+        depth = contactRadius - distance
       } else if (halfWidth - Math.abs(localX) < halfLength - Math.abs(localZ)) {
         normalX = localX < 0 ? -1 : 1
         normalZ = 0
-        depth = RIDER_TRAFFIC_RADIUS + halfWidth - Math.abs(localX)
+        depth = contactRadius + halfWidth - Math.abs(localX)
       } else {
         normalX = 0
         normalZ = localZ < 0 ? -1 : 1
-        depth = RIDER_TRAFFIC_RADIUS + halfLength - Math.abs(localZ)
+        depth = contactRadius + halfLength - Math.abs(localZ)
       }
       if (!this.contacts.has(vehicle.id)) {
         this.contacts.add(vehicle.id)
