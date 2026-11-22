@@ -116,12 +116,12 @@ export function buildWorld(layout: CityLayout) {
   }
 
   for (const block of layout.blocks) {
-    const b = block.bounds
+    const b = block.buildableBounds
     const x = (b.minX + b.maxX) / 2
     const z = (b.minZ + b.maxZ) / 2
     put(foundations, x, 0.08, z, b.maxX - b.minX, 0.16, b.maxZ - b.minZ, '#d4d2bd')
-    put(foundations, x, 0.18, z, 4.4, 0.08, 51, '#9fb286')
-    put(foundations, x, 0.19, z, 12, 0.08, 8, '#e6dcc0')
+    put(foundations, x, 0.18, z, 4.4, 0.04, 51, '#9fb286')
+    put(foundations, x, 0.21, z, 12, 0.02, 8, '#e6dcc0')
   }
   for (const sidewalk of layout.sidewalks) {
     const b = sidewalk.bounds
@@ -158,7 +158,7 @@ export function buildWorld(layout: CityLayout) {
     paint(x + 3, z + 10.5, 5, 0.25)
   }
 
-  function facade(building: CityBuilding, side: Direction, along: number, y: number, offset = 0.035) {
+  function facade(building: CityBuilding, side: Direction, along: number, y: number, offset = 0.055) {
     const b = building.bounds
     const yaw = FACING[side]
     const extent = (side === 'east' || side === 'west' ? b.maxX - b.minX : b.maxZ - b.minZ) / 2
@@ -193,14 +193,19 @@ export function buildWorld(layout: CityLayout) {
     const accent = kind === 'shop' ? SHOP_COLORS[index % SHOP_COLORS.length]
       : kind === 'apartment' ? '#8b5146' : kind === 'hospital' ? '#a34840'
         : kind === 'school' ? '#397e72' : '#3d6e79'
-    put(shells, x, BUILDING_BASE + h / 2, z, width, h, depth, palette[index % palette.length])
+    const plinthHeight = 0.7
+    const upperHeight = Math.max(0.5, h - plinthHeight)
+    // 底座与主体墙面垂直堆叠且零重叠，彻底消除建筑底部共面 Z-Fighting 条纹屏闪。
+    put(details, x, BUILDING_BASE + plinthHeight / 2, z, width, plinthHeight, depth, kind === 'shop' ? accent : '#b8bcae')
+    put(shells, x, BUILDING_BASE + plinthHeight + upperHeight / 2, z, width, upperHeight, depth, palette[index % palette.length])
     put(details, x, BUILDING_BASE + h + 0.24, z, width, 0.48, depth, kind === 'apartment' ? '#825e52' : '#f0e5c9')
-    put(details, x, BUILDING_BASE + 0.35, z, width, 0.7, depth, kind === 'shop' ? accent : '#b8bcae')
 
     if (kind === 'office') {
       put(details, x, BUILDING_BASE + h + 1.1, z, width * 0.68, 1.7, depth * 0.62, '#5b808d')
-      for (const dx of [-width / 2 + 0.35, width / 2 - 0.35]) {
-        for (const dz of [-depth / 2 + 0.35, depth / 2 - 0.35]) put(details, x + dx, BUILDING_BASE + h / 2, z + dz, 0.7, h, 0.7, '#d5e4df')
+      for (const dx of [-width / 2 + 0.31, width / 2 - 0.31]) {
+        for (const dz of [-depth / 2 + 0.31, depth / 2 - 0.31]) {
+          put(details, x + dx, BUILDING_BASE + plinthHeight + upperHeight / 2, z + dz, 0.7, upperHeight, 0.7, '#d5e4df')
+        }
       }
     } else if (kind === 'apartment') {
       put(details, x, BUILDING_BASE + h + 0.85, z, width * 0.66, 1.2, depth * 0.57, '#b9957b')
@@ -226,7 +231,7 @@ export function buildWorld(layout: CityLayout) {
       }
     }
 
-    const entry = facade(building, front, 0, 1.45, 0.08)
+    const entry = facade(building, front, 0, 1.45, 0.095)
     put(windows, entry.x, entry.y, entry.z, kind === 'shop' ? 2.1 : 3.2, 2.6, 1, '#284d56', entry.yaw)
     const signHeight = kind === 'shop' ? 3.1 : 2.8
     const signY = kind === 'shop' ? h - 1.75 : Math.min(h - 2.2, 6)

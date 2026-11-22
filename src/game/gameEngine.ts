@@ -97,9 +97,6 @@ export class GameEngine {
   private fps = 0
   private viewportWidth = 1
   private viewportHeight = 1
-  private orbitPointerId: number | null = null
-  private orbitLastX = 0
-  private orbitLastY = 0
 
   constructor(container: HTMLElement, onSnapshot: (snapshot: EngineSnapshot) => void) {
     this.container = container
@@ -112,8 +109,7 @@ export class GameEngine {
     this.renderer.shadowMap.type = PCFShadowMap
     this.renderer.domElement.tabIndex = 0
     this.renderer.domElement.setAttribute('role', 'img')
-    this.renderer.domElement.setAttribute('aria-label', '外卖骑手驾驶场景，WASD或方向键骑行，空格急刹，Shift冲刺，鼠标拖拽自由视角，滚轮缩放，C切换视角，H鸣笛')
-    this.renderer.domElement.style.cursor = 'grab'
+    this.renderer.domElement.setAttribute('aria-label', '外卖骑手驾驶场景，WASD或方向键骑行，空格急刹，Shift冲刺，鼠标移动自由观察视角（左右270°），滚轮缩放，C切换视角，H鸣笛')
     this.container.append(this.renderer.domElement)
 
     this.scene.background = new Color('#dce7d5')
@@ -152,21 +148,16 @@ export class GameEngine {
     window.addEventListener('keyup', this.onKeyUp)
     window.addEventListener('blur', this.clearInput)
     document.addEventListener('visibilitychange', this.onVisibilityChange)
-    this.renderer.domElement.addEventListener('pointerdown', this.onCanvasPointerDown)
+    this.renderer.domElement.addEventListener('pointerdown', this.focusCanvas)
     this.renderer.domElement.addEventListener('pointermove', this.onCanvasPointerMove)
-    this.renderer.domElement.addEventListener('pointerup', this.onCanvasPointerUp)
-    this.renderer.domElement.addEventListener('pointercancel', this.onCanvasPointerUp)
     this.renderer.domElement.addEventListener('wheel', this.onCanvasWheel, { passive: false })
     this.renderer.domElement.addEventListener('dblclick', this.onCanvasDoubleClick)
-    this.renderer.domElement.addEventListener('contextmenu', this.onCanvasContextMenu)
     this.resize()
   }
 
   setCityView(view: CityView) {
     this.clearInput()
-    this.endOrbitDrag()
     this.view = view
-    this.renderer.domElement.style.cursor = view === 'ride' ? 'grab' : 'default'
     this.riderPreview = 'parked'
     this.previewTime = 0
     this.dust.clear()
@@ -366,13 +357,10 @@ export class GameEngine {
     window.removeEventListener('keyup', this.onKeyUp)
     window.removeEventListener('blur', this.clearInput)
     document.removeEventListener('visibilitychange', this.onVisibilityChange)
-    this.renderer.domElement.removeEventListener('pointerdown', this.onCanvasPointerDown)
+    this.renderer.domElement.removeEventListener('pointerdown', this.focusCanvas)
     this.renderer.domElement.removeEventListener('pointermove', this.onCanvasPointerMove)
-    this.renderer.domElement.removeEventListener('pointerup', this.onCanvasPointerUp)
-    this.renderer.domElement.removeEventListener('pointercancel', this.onCanvasPointerUp)
     this.renderer.domElement.removeEventListener('wheel', this.onCanvasWheel)
     this.renderer.domElement.removeEventListener('dblclick', this.onCanvasDoubleClick)
-    this.renderer.domElement.removeEventListener('contextmenu', this.onCanvasContextMenu)
     this.keys.clear()
     this.controls.dispose()
     this.dust.dispose()
@@ -390,49 +378,15 @@ export class GameEngine {
 
   readonly focusCanvas = () => this.renderer.domElement.focus({ preventScroll: true })
 
-  private endOrbitDrag() {
-    if (this.orbitPointerId !== null) {
-      try {
-        if (this.renderer.domElement.hasPointerCapture(this.orbitPointerId)) {
-          this.renderer.domElement.releasePointerCapture(this.orbitPointerId)
-        }
-      } catch {
-        // Ignore if pointer capture is already released.
-      }
-      this.orbitPointerId = null
-    }
-    this.followCamera.setDragging(false)
-    this.renderer.domElement.style.cursor = this.view === 'ride' ? 'grab' : 'default'
-  }
-
-  private readonly onCanvasPointerDown = (event: PointerEvent) => {
-    this.focusCanvas()
-    if (this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
-    if (event.button !== 0 && event.button !== 2) return
-    this.orbitPointerId = event.pointerId
-    this.orbitLastX = event.clientX
-    this.orbitLastY = event.clientY
-    this.followCamera.setDragging(true)
-    this.renderer.domElement.style.cursor = 'grabbing'
-    try {
-      this.renderer.domElement.setPointerCapture(event.pointerId)
-    } catch {
-      // Synthetic pointer events in tests may not support capture.
-    }
-  }
-
   private readonly onCanvasPointerMove = (event: PointerEvent) => {
-    if (this.orbitPointerId !== event.pointerId || this.view !== 'ride') return
-    const dx = event.clientX - this.orbitLastX
-    const dy = event.clientY - this.orbitLastY
-    this.orbitLastX = event.clientX
-    this.orbitLastY = event.clientY
-    this.followCamera.orbitBy(dx, dy)
-  }
-
-  private readonly onCanvasPointerUp = (event: PointerEvent) => {
-    if (this.orbitPointerId !== event.pointerId) return
-    this.endOrbitDrag()
+    if (this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
+    if (event.pointerType === 'touch') return
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) return
+    // 以画布中心为正前方，按画布 44% 半径映射至 [-1, 1]，无需按键即可丝滑侧头观察。
+    const nx = (event.clientX - (rect.left + rect.width / 2)) / (rect.width * 0.44)
+    const ny = (event.clientY - (rect.top + rect.height / 2)) / (rect.height * 0.44)
+    this.followCamera.setPointerLook(nx, ny)
   }
 
   private readonly onCanvasWheel = (event: WheelEvent) => {
@@ -446,14 +400,9 @@ export class GameEngine {
     this.followCamera.resetOrbit()
   }
 
-  private readonly onCanvasContextMenu = (event: MouseEvent) => {
-    if (this.view === 'ride') event.preventDefault()
-  }
-
   private readonly clearInput = () => {
     this.keys.clear()
     this.controller.stop()
-    this.endOrbitDrag()
     this.hornRemaining = 0
     this.trafficVisuals.clearHorn()
   }

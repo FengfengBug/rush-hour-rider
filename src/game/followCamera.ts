@@ -6,15 +6,21 @@ const MODES: Record<RideCameraMode, { distance: number; height: number; lookAhea
   far: { distance: 13, height: 8, lookAhead: 1.7 },
   overhead: { distance: 12, height: 23, lookAhead: 2 },
 }
-const MIN_PITCH = 0.12
-const MAX_PITCH = 1.18
+const MAX_ORBIT_YAW = Math.PI * 0.75 // 左右各 135°，总横向视角广度严格限制为 270°
+const MIN_PITCH = 0.14
+const MAX_PITCH = 1.08
 const MIN_ZOOM = 0.65
 const MAX_ZOOM = 1.45
-const RECENTER_DELAY_SEC = 2.2
 const wrapAngle = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle))
+const applyDeadzone = (value: number, deadzone: number) => {
+  const abs = Math.abs(value)
+  if (abs <= deadzone) return 0
+  const scaled = Math.min(1, (abs - deadzone) / (1 - deadzone))
+  return Math.sign(value) * Math.pow(scaled, 1.15)
+}
 
 export class FollowCamera {
-  readonly camera = new PerspectiveCamera(52, 16 / 9, 0.1, 1200)
+  readonly camera = new PerspectiveCamera(52, 16 / 9, 0.35, 1200)
 
   private readonly obstacles: Box3[]
   private readonly roofHeight: number
@@ -34,9 +40,9 @@ export class FollowCamera {
   private heading = 0
   private orbitYaw = 0
   private orbitPitch = 0
+  private targetOrbitYaw = 0
+  private targetOrbitPitch = 0
   private zoomScale = 1
-  private dragging = false
-  private orbitIdleSec = 0
   private initialized = false
 
   constructor(buildings: readonly CityBuilding[]) {
@@ -57,36 +63,32 @@ export class FollowCamera {
     this.resetOrbit()
   }
 
-  setDragging(dragging: boolean): void {
-    this.dragging = dragging
-    if (dragging) this.orbitIdleSec = 0
-  }
-
-  orbitBy(deltaX: number, deltaY: number): void {
+  setPointerLook(normalizedX: number, normalizedY: number): void {
+    const sx = applyDeadzone(Math.max(-1, Math.min(1, normalizedX)), 0.05)
+    const sy = applyDeadzone(Math.max(-1, Math.min(1, normalizedY)), 0.06)
+    this.targetOrbitYaw = Math.max(-MAX_ORBIT_YAW, Math.min(MAX_ORBIT_YAW, -sx * MAX_ORBIT_YAW))
     const basePitch = this.basePitch()
-    this.orbitYaw = wrapAngle(this.orbitYaw - deltaX * 0.0062)
-    const nextPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, basePitch + this.orbitPitch + deltaY * 0.0046))
-    this.orbitPitch = nextPitch - basePitch
-    this.orbitIdleSec = 0
+    const rawPitch = basePitch + (sy >= 0 ? sy * 0.52 : sy * 0.28)
+    const clampedPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, rawPitch))
+    this.targetOrbitPitch = clampedPitch - basePitch
   }
 
   zoomBy(deltaY: number): void {
     const factor = Math.exp(Math.max(-240, Math.min(240, deltaY)) * 0.00085)
     this.zoomScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoomScale * factor))
-    this.orbitIdleSec = 0
   }
 
   resetOrbit(): void {
     this.orbitYaw = 0
     this.orbitPitch = 0
+    this.targetOrbitYaw = 0
+    this.targetOrbitPitch = 0
     this.zoomScale = 1
-    this.orbitIdleSec = 0
   }
 
   reset(position: Point2, heading: number): void {
     this.heading = wrapAngle(heading)
     this.resetOrbit()
-    this.dragging = false
     this.prepareGoals(position)
     this.camera.position.copy(this.goal)
     this.lookTarget.copy(this.lookGoal)
@@ -101,7 +103,7 @@ export class FollowCamera {
     position: Point2,
     heading: number,
     deltaSeconds: number,
-    speed = 0,
+    _speed = 0,
     distraction = 0,
     distractionTime = 0,
     reducedMotion = false,
@@ -114,23 +116,15 @@ export class FollowCamera {
     const turn = wrapAngle(heading - this.heading)
     this.heading = wrapAngle(this.heading + turn * (1 - Math.exp(-10 * dt)))
 
-    if (!this.dragging) {
-      this.orbitIdleSec += dt
-      if (Math.abs(speed) > 1.2 && this.orbitIdleSec >= RECENTER_DELAY_SEC) {
-        const yawDecay = Math.exp(-2.8 * dt)
-        const pitchDecay = Math.exp(-2.4 * dt)
-        this.orbitYaw *= yawDecay
-        this.orbitPitch *= pitchDecay
-        if (Math.abs(this.orbitYaw) < 0.004) this.orbitYaw = 0
-        if (Math.abs(this.orbitPitch) < 0.004) this.orbitPitch = 0
-      }
-    }
+    const yawBlend = 1 - Math.exp(-9 * dt)
+    const pitchBlend = 1 - Math.exp(-8 * dt)
+    this.orbitYaw += (this.targetOrbitYaw - this.orbitYaw) * yawBlend
+    this.orbitPitch += (this.targetOrbitPitch - this.orbitPitch) * pitchBlend
+    this.orbitYaw = Math.max(-MAX_ORBIT_YAW, Math.min(MAX_ORBIT_YAW, this.orbitYaw))
 
     this.prepareGoals(position)
-    const positionFreq = this.dragging ? 20 : 8.5
-    const lookFreq = this.dragging ? 22 : 11
-    this.spring(this.camera.position, this.positionVelocity, this.goal, positionFreq, dt)
-    this.spring(this.lookTarget, this.lookVelocity, this.lookGoal, lookFreq, dt)
+    this.spring(this.camera.position, this.positionVelocity, this.goal, 11, dt)
+    this.spring(this.lookTarget, this.lookVelocity, this.lookGoal, 13, dt)
     if (this.shortenSegment(this.camera.position)) this.positionVelocity.set(0, 0, 0)
     if (this.shortenSegment(this.lookTarget)) this.lookVelocity.set(0, 0, 0)
     this.lookAtPoint.copy(this.lookTarget)
