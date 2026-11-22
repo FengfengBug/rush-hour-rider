@@ -384,6 +384,28 @@ export interface EventSnapshot {
   readonly transferredCount: number
 }
 
+export type InteriorTheme = 'cbd' | 'hospital'
+export type InteriorMode = 'none' | 'walk' | 'photo'
+
+export interface InteriorSnapshot {
+  readonly mode: InteriorMode
+  readonly canEnter: boolean
+  readonly nearbyLandmarkId: string | null
+  readonly nearbyLandmarkName: string | null
+  readonly nearbyTheme: InteriorTheme | null
+  readonly nearbyOrderId: string | null
+  readonly theme: InteriorTheme | null
+  readonly landmarkId: string | null
+  readonly landmarkName: string | null
+  readonly orderId: string | null
+  readonly merchantName: string | null
+  readonly atDropZone: boolean
+  readonly dropDistance: number
+  readonly elapsedSec: number
+  readonly photoFlash: number
+  readonly photoSuccessText: string | null
+}
+
 export interface EngineSnapshot {
   view: CityView
   cameraMode: RideCameraMode
@@ -392,6 +414,7 @@ export interface EngineSnapshot {
   shift: ShiftSnapshot
   distraction: DistractionSnapshot
   events: EventSnapshot
+  interior: InteriorSnapshot
   rider: RiderSnapshot
   traffic: TrafficSnapshot
   navigation: NavigationSnapshot

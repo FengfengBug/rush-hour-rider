@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, Inbox, MessageSquare, Navigation, Signal, Store, Wallet, Zap } from 'lucide-react'
+import { Camera, ChevronDown, ChevronUp, Inbox, MessageSquare, Navigation, Signal, Store, Wallet, Zap } from 'lucide-react'
 import { CITY_LAYOUT } from '../game/cityLayout'
 import type { GameEngine } from '../game/gameEngine'
 import { MAX_ACTIVE_ORDERS } from '../game/orderManager'
@@ -99,7 +99,9 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
   const panelId = useId()
   const orders = snapshot?.orders
   const shiftEnded = snapshot?.shift.ended ?? false
-  const eventBlocking = !!snapshot?.events.active
+  const interior = snapshot?.interior
+  const photoMode = interior?.mode === 'photo'
+  const eventBlocking = !!snapshot?.events.active || photoMode
   const elapsed = orders?.elapsedSec ?? 0
   const active = orders?.active ?? []
   const offers = orders?.offers ?? []
@@ -190,6 +192,8 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
     if (order && message.kind === 'customer') return `顾客 · ${landmarkName(order.deliveryId)}`
     return sourceLabels[message.kind]
   }
+
+  if (photoMode) return null
 
   return (
     <aside className="rider-phone" data-open={open} aria-label="极速达骑手手机" onFocusCapture={(event) => {
@@ -296,6 +300,19 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
                         <div className="rider-phone-countdown"><strong>{countdown(remaining)}</strong><span>限时 {order.idealSec} 秒</span></div>
                         <div className="rider-phone-progress" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, remaining / Math.max(1, order.deadline - order.acceptedAt) * 100))}%` }} /></div>
                         <p className="rider-phone-delivery-meta">已用 {order.actualSec.toFixed(1)} 秒 · 基础费 {money(order.baseFeeCents)}</p>
+                        {interior?.mode === 'walk' && interior.orderId === order.id && (
+                          <button
+                            className="rider-phone-primary"
+                            type="button"
+                            disabled={!interior.atDropZone || orders?.paused}
+                            onClick={() => {
+                              if (engine?.openDeliveryCamera()) onOpenChange(false)
+                            }}
+                          >
+                            <Camera size={15} aria-hidden="true" />
+                            {interior.atDropZone ? '拍照点送达（第一人称留证）' : `走到外卖存放处拍照（距 ${interior.dropDistance.toFixed(1)} m）`}
+                          </button>
+                        )}
                         <button className="rider-phone-secondary rider-phone-navigate" type="button" disabled={!engine || orders?.paused} aria-pressed={priority} aria-label={`优先导航 ${order.id}，前往${destination}${orders?.paused ? '，暂停中不可用' : ''}`} onClick={() => prioritize(order.id)}><Navigation size={14} aria-hidden="true" />{orders?.paused ? '暂停中，暂不可导航' : `${priority ? '正在导航' : '优先导航'} · ${order.status === 'pickup' ? '取餐' : '送达'}`}</button>
                         <ReportForm order={order} unavailable={!engine || !!orders?.paused} onReport={report} />
                       </li>

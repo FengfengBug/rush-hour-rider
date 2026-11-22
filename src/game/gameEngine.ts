@@ -24,7 +24,8 @@ import { NavigationSystem } from './navigationSystem'
 import { buildNavigationVisuals } from './navigationVisuals'
 import { OrderManager } from './orderManager'
 import { EventSystem, type EventResolution } from './eventSystem'
-import type { CityView, Direction, EngineSnapshot, NavigationFrameListener, OrderReportReason, RideCameraMode, RiderPreviewMode } from './types'
+import { InteriorScene } from './interiorScene'
+import type { CityLandmark, CityView, Direction, EngineSnapshot, InteriorTheme, NavigationFrameListener, OrderReportReason, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
   'food-street': 'shaxian-snacks',
@@ -66,6 +67,8 @@ export class GameEngine {
   private readonly navigation = new NavigationSystem(CITY_LAYOUT, RIDER_COLLISION_RADIUS)
   private readonly orders = new OrderManager(CITY_LAYOUT)
   private readonly eventSystem = new EventSystem()
+  private readonly interior = new InteriorScene()
+  private readonly enterableLandmarks: readonly { landmark: CityLandmark; theme: InteriorTheme }[]
   private readonly navigationVisuals: ReturnType<typeof buildNavigationVisuals>
   private navigationFrameListener: NavigationFrameListener | null = null
   private navigationElapsed = 0
@@ -127,6 +130,16 @@ export class GameEngine {
     this.scene.add(this.sunlight, this.sunlight.target)
     this.world = buildWorld(CITY_LAYOUT)
     this.scene.add(this.world.root)
+    const buildingKinds = new Map(CITY_LAYOUT.buildings.map((building) => [building.id, building.kind]))
+    this.enterableLandmarks = CITY_LAYOUT.landmarks
+      .filter((landmark) => {
+        const kind = buildingKinds.get(landmark.buildingId)
+        return kind === 'office' || kind === 'tech' || kind === 'hospital'
+      })
+      .map((landmark) => ({
+        landmark,
+        theme: buildingKinds.get(landmark.buildingId) === 'hospital' ? 'hospital' as const : 'cbd' as const,
+      }))
     this.rider = buildRiderVehicle()
     this.trafficVisuals = buildTrafficVisuals(CITY_LAYOUT, this.traffic.signals, this.traffic.vehicles)
     this.navigationVisuals = buildNavigationVisuals(this.navigation.targets)
@@ -161,6 +174,7 @@ export class GameEngine {
 
   setCityView(view: CityView) {
     this.clearInput()
+    if (view !== 'ride' && this.interior.mode !== 'none') this.interior.exit()
     this.view = view
     this.riderPreview = 'parked'
     this.previewTime = 0
@@ -284,6 +298,76 @@ export class GameEngine {
     else this.lastSnapshotTime = 0
   }
 
+  enterNearbyBuilding(): boolean {
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded || this.eventSystem.hasActiveEvent || this.interior.mode !== 'none') {
+      return false
+    }
+    const nearby = this.findNearbyEnterable()
+    if (!nearby) return false
+    const order = this.orders.getOrderForEnterableDelivery(nearby.landmark.id)
+    this.clearInput()
+    this.distractionActive = false
+    this.distractionLevel = 0
+    this.interior.enter({
+      theme: nearby.theme,
+      landmarkId: nearby.landmark.id,
+      landmarkName: nearby.landmark.name,
+      orderId: order?.orderId ?? null,
+      merchantName: order?.merchantName ?? null,
+    })
+    this.lastSnapshotTime = 0
+    this.focusCanvas()
+    return true
+  }
+
+  exitBuilding(): void {
+    if (this.interior.mode === 'none') return
+    this.interior.exit()
+    this.keys.clear()
+    this.followCamera.reset(this.controller.state, this.controller.state.heading)
+    this.lastSnapshotTime = 0
+    this.focusCanvas()
+  }
+
+  openDeliveryCamera(): boolean {
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded || this.interior.mode !== 'walk') return false
+    if (!this.interior.openPhotoMode()) return false
+    this.keys.clear()
+    this.lastSnapshotTime = 0
+    this.focusCanvas()
+    return true
+  }
+
+  closeDeliveryCamera(): void {
+    if (this.interior.mode !== 'photo') return
+    this.interior.closePhotoMode()
+    this.lastSnapshotTime = 0
+    this.focusCanvas()
+  }
+
+  captureDeliveryPhoto(): boolean {
+    if (this.interior.mode !== 'photo' || !this.interior.orderId || this.interior.photoSuccessText) return false
+    const landmarkName = this.interior.landmarkName ?? '建筑大堂'
+    const orderId = this.interior.orderId
+    if (!this.orders.completeInteriorPhotoDelivery(orderId, landmarkName)) return false
+    this.interior.triggerShutter(`${orderId} 拍照存证成功 · 已确认送达！`)
+    this.syncOrderNavigation()
+    this.lastSnapshotTime = 0
+    return true
+  }
+
+  private findNearbyEnterable(): { landmark: CityLandmark; theme: InteriorTheme } | null {
+    const state = this.controller.state
+    let best: { landmark: CityLandmark; theme: InteriorTheme; dist: number } | null = null
+    for (const entry of this.enterableLandmarks) {
+      const dist = Math.hypot(state.x - entry.landmark.access.position.x, state.z - entry.landmark.access.position.z)
+      if (dist <= 6.2 && (!best || dist < best.dist)) {
+        best = { ...entry, dist }
+      }
+    }
+    return best ? { landmark: best.landmark, theme: best.theme } : null
+  }
+
   private applyEventResolution(resolution: EventResolution) {
     if (resolution.staminaCost > 0) this.controller.consumeStamina(resolution.staminaCost)
     this.orders.applyEventResolution(resolution)
@@ -313,6 +397,7 @@ export class GameEngine {
   }
 
   resetRider() {
+    this.interior.exit()
     this.controller.reset()
     this.orders.reset()
     this.eventSystem.reset()
@@ -372,6 +457,7 @@ export class GameEngine {
     this.navigationFrameListener = null
     this.navigationVisuals.dispose()
     this.rider.dispose()
+    this.interior.dispose()
     this.world.dispose()
     this.sunlight.shadow.dispose()
     this.scene.clear()
@@ -390,7 +476,8 @@ export class GameEngine {
     // 以画布中心为正前方，按画布 44% 半径映射至 [-1, 1]，无需按键即可丝滑侧头观察。
     const nx = (event.clientX - (rect.left + rect.width / 2)) / (rect.width * 0.44)
     const ny = (event.clientY - (rect.top + rect.height / 2)) / (rect.height * 0.44)
-    this.followCamera.setPointerLook(nx, ny)
+    if (this.interior.mode === 'walk') this.interior.setPointerLook(nx, ny)
+    else if (this.interior.mode === 'none') this.followCamera.setPointerLook(nx, ny)
   }
 
   private readonly onCanvasWheel = (event: WheelEvent) => {
@@ -420,7 +507,34 @@ export class GameEngine {
   private readonly onKeyDown = (event: KeyboardEvent) => {
     if (event.ctrlKey || event.metaKey || event.altKey) return
     if (this.eventSystem.hasActiveEvent) return
+    if (this.interior.mode === 'photo') {
+      if (event.code === 'Space' || event.code === 'Enter') {
+        event.preventDefault()
+        if (!event.repeat) this.captureDeliveryPhoto()
+      } else if (event.code === 'Escape') {
+        event.preventDefault()
+        if (!event.repeat) this.closeDeliveryCamera()
+      }
+      return
+    }
     if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, button, a, summary, [contenteditable="true"]')) return
+    if (this.interior.mode === 'walk') {
+      if (event.code === 'KeyE') {
+        event.preventDefault()
+        if (!event.repeat) this.exitBuilding()
+      } else if (event.code === 'KeyF') {
+        event.preventDefault()
+        if (!event.repeat) this.openDeliveryCamera()
+      } else if (DRIVING_KEYS.has(event.code)) {
+        if (!event.code.startsWith('Shift')) event.preventDefault()
+        this.keys.add(event.code)
+      }
+      return
+    }
+    if (event.code === 'KeyE' && this.view === 'ride' && !this.shiftEnded) {
+      if (!event.repeat && this.enterNearbyBuilding()) event.preventDefault()
+      return
+    }
     if (event.code === 'KeyC') {
       event.preventDefault()
       if (!event.repeat) this.cycleRideCameraMode()
@@ -460,6 +574,7 @@ export class GameEngine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.setSize(this.viewportWidth, this.viewportHeight, false)
     this.followCamera.resize(this.viewportWidth, this.viewportHeight)
+    this.interior.resize(this.viewportWidth, this.viewportHeight)
     const aspect = this.viewportWidth / this.viewportHeight
     const halfHeight = 565 / Math.min(aspect, 1)
     const halfWidth = halfHeight * aspect
@@ -477,7 +592,30 @@ export class GameEngine {
     this.previousTime = time
     const shiftActive = this.view === 'ride' && !document.hidden && !this.shiftEnded
     const eventBlocking = this.eventSystem.hasActiveEvent
-    if (shiftActive && !eventBlocking) {
+    const insideBuilding = this.interior.mode !== 'none'
+    if (insideBuilding) {
+      this.distractionActive = false
+      this.distractionLevel = 0
+      if (shiftActive) {
+        const stepSeconds = Math.min(deltaSeconds, Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed))
+        this.shiftElapsed += stepSeconds
+        this.eventSystem.updateRidingCooldown(stepSeconds)
+        this.traffic.update(stepSeconds)
+        this.trafficVisuals.update(stepSeconds)
+        this.orders.updateInterior(stepSeconds, this.controller.state)
+        const forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'))
+        const strafe = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'))
+        const shouldAutoExit = this.interior.update(stepSeconds, { forward, strafe })
+        if (shouldAutoExit) this.exitBuilding()
+        if (this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
+          this.shiftElapsed = SHIFT_DURATION_SECONDS
+          this.shiftEnded = true
+          if (this.interior.mode === 'photo') this.interior.closePhotoMode()
+          this.keys.clear()
+          this.lastSnapshotTime = 0
+        }
+      }
+    } else if (shiftActive && !eventBlocking) {
       const stepSeconds = Math.min(deltaSeconds, Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed))
       this.shiftElapsed += stepSeconds
       this.eventSystem.updateRidingCooldown(stepSeconds)
@@ -593,10 +731,14 @@ export class GameEngine {
       }
       this.controls.update(deltaSeconds)
     }
-    this.navigationVisuals.update(deltaSeconds, this.controller.state, this.navigation.snapshot, this.view === 'ride')
-    this.navigationFrameListener?.(this.controller.state, this.navigation.snapshot)
-    this.world.updateCanopyOcclusion(this.followCamera.camera.position, this.view === 'ride' ? this.rider.root.position : null, deltaSeconds)
-    this.renderer.render(this.scene, this.view === 'ride' ? this.followCamera.camera : this.previewCamera)
+    if (this.interior.mode !== 'none') {
+      this.renderer.render(this.interior.scene, this.interior.camera)
+    } else {
+      this.navigationVisuals.update(deltaSeconds, this.controller.state, this.navigation.snapshot, this.view === 'ride')
+      this.navigationFrameListener?.(this.controller.state, this.navigation.snapshot)
+      this.world.updateCanopyOcclusion(this.followCamera.camera.position, this.view === 'ride' ? this.rider.root.position : null, deltaSeconds)
+      this.renderer.render(this.scene, this.view === 'ride' ? this.followCamera.camera : this.previewCamera)
+    }
     this.sampleFrames += 1
     const sampleDuration = time - this.sampleStartedAt
     if (sampleDuration >= 500) {
@@ -605,9 +747,13 @@ export class GameEngine {
       this.sampleStartedAt = time
     }
     const eventSnapshot = this.eventSystem.getSnapshot()
-    const snapshotInterval = eventSnapshot.active?.sprint?.active ? 33 : 100
+    const snapshotInterval = eventSnapshot.active?.sprint?.active || this.interior.photoFlash > 0 ? 33 : 100
     if (time - this.lastSnapshotTime >= snapshotInterval) {
       const state = this.controller.state
+      const nearbyEnterable = this.interior.mode === 'none' && this.view === 'ride' && !this.shiftEnded && !eventBlocking
+        ? this.findNearbyEnterable()
+        : null
+      const nearbyOrder = nearbyEnterable ? this.orders.getOrderForEnterableDelivery(nearbyEnterable.landmark.id) : null
       let instanceCount = 0
       this.scene.traverse((object) => { if (object instanceof InstancedMesh && object.visible) instanceCount += object.count })
       this.onSnapshot({
@@ -630,6 +776,24 @@ export class GameEngine {
           warningCount: this.distractionWarningCount,
         },
         events: eventSnapshot,
+        interior: {
+          mode: this.interior.mode,
+          canEnter: nearbyEnterable !== null,
+          nearbyLandmarkId: nearbyEnterable?.landmark.id ?? null,
+          nearbyLandmarkName: nearbyEnterable?.landmark.name ?? null,
+          nearbyTheme: nearbyEnterable?.theme ?? null,
+          nearbyOrderId: nearbyOrder?.orderId ?? null,
+          theme: this.interior.theme,
+          landmarkId: this.interior.landmarkId,
+          landmarkName: this.interior.landmarkName,
+          orderId: this.interior.orderId,
+          merchantName: this.interior.merchantName,
+          atDropZone: this.interior.atDropZone,
+          dropDistance: this.interior.dropDistance,
+          elapsedSec: this.interior.elapsedSec,
+          photoFlash: this.interior.photoFlash,
+          photoSuccessText: this.interior.photoSuccessText,
+        },
         rider: {
           x: state.x, z: state.z, heading: state.heading, speed: state.speed,
           battery: state.battery, stamina: state.stamina, standLeg: state.standLeg, distance: state.distance, braking: state.braking,

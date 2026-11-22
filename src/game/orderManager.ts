@@ -73,8 +73,8 @@ export class OrderManager {
     this.notice = '开工了，选择一单开始配送。'
     const nearby = [...this.merchants].sort((a, b) => distance(a.access.position, this.spawn) - distance(b.access.position, this.spawn))
     const usedDestinations = new Set<string>()
-    // 开局三单涵盖不同特征送达区（含高端封闭小区御景华府），方便快速体验多元街区与门禁差异。
-    const preferredDeliveries = ['xingfuli-estate', 'yujing-manor', 'starlight-tower']
+    // 开局三单涵盖三大特色送达体验：CBD 入楼拍照送达（星辰科技大厦）、高端封闭小区门禁（御景华府）、老旧开放小区直达（幸福里小区）。
+    const preferredDeliveries = ['starlight-tower', 'yujing-manor', 'xingfuli-estate']
     nearby.slice(0, 3).forEach((merchant, index) => {
       const preferredId = preferredDeliveries[index]
       const preferred = preferredId ? this.destinations.find((entry) => entry.id === preferredId && !usedDestinations.has(entry.id)) : undefined
@@ -138,6 +138,51 @@ export class OrderManager {
     return true
   }
 
+  isEnterableBuildingKind(kind: BuildingKind): boolean {
+    return kind === 'office' || kind === 'tech' || kind === 'hospital'
+  }
+
+  getOrderForEnterableDelivery(landmarkId: string): { orderId: string; merchantName: string } | null {
+    const order = this.active.find((entry) => entry.status === 'delivery' && entry.deliveryId === landmarkId)
+    if (!order) return null
+    return {
+      orderId: order.id,
+      merchantName: this.landmarks.get(order.merchantId)?.name ?? order.merchantId,
+    }
+  }
+
+  updateInterior(deltaSeconds: number, rider: Point2): void {
+    const startedAt = this.elapsed
+    this.elapsed += deltaSeconds
+    for (const order of this.active) {
+      order.ledger.lastMileSec += deltaSeconds
+      order.actualSec += deltaSeconds
+      const reminderAt = Math.max(order.acceptedAt, order.deadline - 15)
+      if (!this.reminded.has(order.id) && startedAt + deltaSeconds >= reminderAt) {
+        this.reminded.add(order.id)
+        this.addMessage(order.id, 'customer', '快到配送时限了，麻烦留意送达进度。', reminderAt)
+      }
+    }
+    this.offers = this.offers.filter((offer) => offer.expiresAt > this.elapsed)
+    while (this.elapsed >= this.nextOfferAt) {
+      this.refreshOffer(rider, this.nextOfferAt)
+      this.nextOfferAt += this.interval()
+    }
+    this.offers = this.offers.filter((offer) => offer.expiresAt > this.elapsed)
+  }
+
+  completeInteriorPhotoDelivery(orderId: string, landmarkName: string): boolean {
+    const target = this.active.find((entry) => entry.id === orderId && entry.status === 'delivery')
+    if (!target) return false
+    this.addMessage(target.id, 'rider', `已在${landmarkName}一楼外卖存放处拍照留证并点击送达。`, this.elapsed)
+    this.settleOrder(target, this.elapsed)
+    this.active = this.active.filter((order) => order.status !== 'completed')
+    if (!this.active.some((order) => order.id === this.priorityId)) {
+      this.priorityId = [...this.active].sort((a, b) => a.deadline - b.deadline)[0]?.id ?? null
+    }
+    return true
+  }
+
   update(
     deltaSeconds: number,
     from: Point2,
@@ -169,6 +214,7 @@ export class OrderManager {
       }
       const deliveryLandmark = this.landmarks.get(order.deliveryId)!
       const delivery = deliveryLandmark.access
+      const deliveryKind = this.buildingKinds.get(deliveryLandmark.buildingId) ?? 'apartment'
       const afterPickup = {
         x: from.x + (rider.x - from.x) * pickupFraction,
         z: from.z + (rider.z - from.z) * pickupFraction,
@@ -176,9 +222,14 @@ export class OrderManager {
       const arrival = !intercepted && order.status === 'delivery'
         ? entryFraction(afterPickup, rider, delivery.position, delivery.radius)
         : null
+      if (arrival !== null && this.isEnterableBuildingKind(deliveryKind)) {
+        // CBD / 医院等人流集中建筑需下车进入一楼大堂放餐并拍照点送达，不在路边直接自动签收。
+        order.ledger[category] += deltaSeconds
+        order.actualSec += deltaSeconds
+        continue
+      }
       if (arrival !== null) {
-        const buildingKind = this.buildingKinds.get(deliveryLandmark.buildingId) ?? 'apartment'
-        if (onArrivalIntercept?.({ phase: 'delivery', order, landmark: deliveryLandmark, buildingKind })) {
+        if (onArrivalIntercept?.({ phase: 'delivery', order, landmark: deliveryLandmark, buildingKind: deliveryKind })) {
           intercepted = true
           order.ledger[category] += deltaSeconds
           order.actualSec += deltaSeconds

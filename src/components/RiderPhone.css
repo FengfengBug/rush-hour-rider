@@ -195,6 +195,7 @@
 .rider-phone-delivery-card[data-critical="true"] .rider-phone-progress { background: #f4dfd7; }
 .rider-phone-delivery-card[data-critical="true"] .rider-phone-progress > span { background: #c95448; }
 .rider-phone .rider-phone-delivery-meta { margin: 6px 0 9px; color: var(--phone-muted); font-size: 12px; line-height: 1.5; }
+.rider-phone-delivery-card .rider-phone-primary { margin-bottom: 7px; }
 .rider-phone .rider-phone-navigate[aria-pressed="true"] { color: #315a3a; border-color: #b5c4a5; background: #eaf1e1; }
 .rider-phone-report { margin-top: 9px; padding-top: 3px; border-top: 1px solid #e6e9de; }
 .rider-phone-report > summary { min-height: 32px; padding: 6px 0; color: #686a5e; font-size: 12px; cursor: pointer; }

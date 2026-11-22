@@ -72,6 +72,8 @@ export function ScaffoldStatus({
   const recentEvents = traffic?.events.slice(0, 3)
   const signalLabels = { red: '红灯', yellow: '黄灯', green: '绿灯' }
   const isRiding = view === 'ride'
+  const interiorMode = snapshot?.interior.mode ?? 'none'
+  const isInside = interiorMode !== 'none'
   const speed = rider ? `${rider.speed > 0 ? '+' : ''}${(rider.speed * 3.6).toFixed(1)}` : '—'
   const direction = rider ? rider.speed < 0 ? '倒车' : rider.speed > 0 ? '前进' : '静止' : '待连接'
   const fps = snapshot && snapshot.fps > 0 ? `${snapshot.fps} FPS` : '采样中'
@@ -80,6 +82,8 @@ export function ScaffoldStatus({
     if (view !== 'rider-rear' && view !== 'rider-side') onViewChange('rider-rear')
     onRiderPreviewChange(mode)
   }
+
+  if (interiorMode === 'photo') return null
 
   return (
     <div className="scene-overlay">
@@ -91,6 +95,7 @@ export function ScaffoldStatus({
         onResetRider={onResetRider}
       />
 
+      {isInside ? <div /> : (
       <div className="scene-controls">
         <section className="navigation-panel" aria-label="订单导航" style={{ borderTopColor: selectedTarget ? NAVIGATION_COLORS[selectedTarget.kind] : undefined }}>
           <header className="navigation-heading">
@@ -343,6 +348,7 @@ export function ScaffoldStatus({
         </details>
         </aside>
       </div>
+      )}
 
       <footer className="scene-footer">
         <div className="scene-caption">
