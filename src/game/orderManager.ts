@@ -47,6 +47,7 @@ export class OrderManager {
   private completed: DeliveryOrder[] = []
   private priorityId: string | null = null
   private incomeCents = 0
+  private operatingCostCents = 0
   private notice = '开工了，选择一单开始配送。'
 
   constructor(layout: CityLayout) {
@@ -70,6 +71,7 @@ export class OrderManager {
     this.completed = []
     this.priorityId = null
     this.incomeCents = 0
+    this.operatingCostCents = 0
     this.notice = '开工了，选择一单开始配送。'
     const nearby = [...this.merchants].sort((a, b) => distance(a.access.position, this.spawn) - distance(b.access.position, this.spawn))
     const usedDestinations = new Set<string>()
@@ -87,6 +89,76 @@ export class OrderManager {
     })
     this.nextOfferAt = this.interval()
     this.revision += 1
+  }
+
+  get activeOrders(): readonly DeliveryOrder[] {
+    return this.active
+  }
+
+  get elapsedSeconds(): number {
+    return this.elapsed
+  }
+
+  getLandmarkName(id: string): string {
+    return this.landmarks.get(id)?.name ?? id
+  }
+
+  findAddonCandidate(rider: Point2): { merchant: CityLandmark; destination: CityLandmark } | null {
+    if (this.active.length >= MAX_ACTIVE_ORDERS) return null
+    const all = this.merchants.flatMap((merchant) => this.destinations.map((destination) => ({ merchant, destination })))
+      .filter(({ merchant, destination }) => ![...this.offers, ...this.active].some((order) => order.merchantId === merchant.id && order.deliveryId === destination.id))
+    const nearby = all.filter(({ merchant, destination }) => (
+      distance(rider, merchant.access.position) <= 220
+      && distance(merchant.access.position, destination.access.position) <= 260
+    ))
+    const pool = nearby.length > 0 ? nearby : all
+    if (pool.length === 0) return null
+    return pool[Math.floor(this.random() * pool.length)]
+  }
+
+  acceptAddonOrder(merchantId: string, deliveryId: string, baseFeeCents: number, rider: Point2): string | null {
+    if (this.active.length >= MAX_ACTIVE_ORDERS) return null
+    const id = `R${String(++this.sequence).padStart(3, '0')}`
+    const estimate = this.estimate(merchantId, deliveryId, rider)
+    this.active.push({
+      id,
+      merchantId,
+      deliveryId,
+      offeredAt: this.elapsed,
+      expiresAt: this.elapsed + OFFER_LIFETIME,
+      ...estimate,
+      baseFeeCents,
+      status: 'pickup',
+      acceptedAt: this.elapsed,
+      acceptedPosition: { x: rider.x, z: rider.z },
+      deadline: this.elapsed + estimate.idealSec,
+      pickedUpAt: null,
+      completedAt: null,
+      actualSec: 0,
+      ledger: { ridingSec: 0, trafficWaitSec: 0, merchantDelaySec: 0, lastMileSec: 0, detourSec: 0, idleSec: 0 },
+      tipCents: 0,
+      eventPenaltyCents: 0,
+      settlement: null,
+      reports: [],
+    })
+    this.priorityId ??= id
+    this.notice = `${id} 顺路加单已接！前往${this.getLandmarkName(merchantId)}取餐。`
+    this.addMessage(id, 'system', `${this.notice}（基础费 ¥${(baseFeeCents / 100).toFixed(2)}）`, this.elapsed)
+    this.revision += 1
+    return id
+  }
+
+  recordOperatingExpense(cents: number, kind: OrderMessage['kind'], text: string, orderId = '系统'): void {
+    if (cents > 0) {
+      this.operatingCostCents += cents
+      this.incomeCents = Math.max(0, this.incomeCents - cents)
+    }
+    this.notice = text
+    this.addMessage(orderId, kind, text, this.elapsed)
+  }
+
+  addSystemMessage(orderId: string, kind: OrderMessage['kind'], text: string): void {
+    this.addMessage(orderId, kind, text, this.elapsed)
   }
 
   get activeTargetIds(): string[] {
@@ -265,7 +337,7 @@ export class OrderManager {
     const target = this.active.find((entry) => entry.id === resolution.orderId)
     if (!target) return
 
-    if (resolution.timeCostSec > 0) {
+    if (resolution.timeCostSec > 0 && resolution.ledgerKey) {
       for (const order of this.active) {
         if (resolution.action === 'transfer-order' && order.id === target.id) continue
         order.ledger[resolution.ledgerKey] += resolution.timeCostSec
@@ -368,7 +440,7 @@ export class OrderManager {
         return { ...offer, ...this.estimate(offer.merchantId, offer.deliveryId, rider), onTheWay: extraDistance <= 35 }
       }),
       active: this.active.map(copy), completed: this.completed.map(copy),
-      priorityId: this.priorityId, incomeCents: this.incomeCents, paused, notice: this.notice,
+      priorityId: this.priorityId, incomeCents: this.incomeCents, operatingCostCents: this.operatingCostCents, paused, notice: this.notice,
     }
   }
 

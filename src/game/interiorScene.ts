@@ -285,7 +285,7 @@ export class InteriorScene {
     this.targetPitch = -deadzone(clampedY, 0.06) * 0.42
   }
 
-  update(deltaSeconds: number, input: InteriorWalkInput): boolean {
+  update(deltaSeconds: number, input: InteriorWalkInput, staminaExhausted = false): boolean {
     if (this.mode === 'none') return false
     const dt = Math.max(0, Math.min(deltaSeconds, 0.05))
     this.elapsedSec += dt
@@ -305,11 +305,12 @@ export class InteriorScene {
       let moveX = forwardX * input.forward + rightX * input.strafe
       let moveZ = forwardZ * input.forward + rightZ * input.strafe
       const length = Math.hypot(moveX, moveZ)
+      const walkSpeed = staminaExhausted ? 3.0 : WALK_SPEED
       if (length > 0.001) {
-        moveX = (moveX / length) * WALK_SPEED * dt
-        moveZ = (moveZ / length) * WALK_SPEED * dt
+        moveX = (moveX / length) * walkSpeed * dt
+        moveZ = (moveZ / length) * walkSpeed * dt
         this.movePlayer(moveX, moveZ)
-        this.walkPhase += dt * 9.5
+        this.walkPhase += dt * (staminaExhausted ? 6.5 : 9.5)
       } else {
         this.walkPhase = 0
       }

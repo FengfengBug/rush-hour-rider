@@ -59,6 +59,10 @@ export class RiderController {
     this.state.stamina = Math.max(0, Math.min(100, this.state.stamina - amount))
   }
 
+  refillBattery() {
+    this.state.battery = 100
+  }
+
   stop() {
     this.touchingWall = false
     Object.assign(this.state, {
@@ -102,13 +106,15 @@ export class RiderController {
     const activeOrders = Math.max(0, input.activeOrderCount ?? 0)
     let speed = state.velocityX * Math.sin(state.heading) + state.velocityZ * Math.cos(state.heading)
     const reversing = input.throttle * speed < -0.1
-    const boost = input.boost && input.throttle > 0 && speed >= 0 && state.battery > 0 && !input.brake
+    const lowBattery = state.battery > 0 && state.battery < 20
+    const boost = input.boost && input.throttle > 0 && speed >= 0 && state.battery >= 20 && !input.brake
+    const forwardTopSpeed = lowBattery ? 6.2 : boost ? 15 : 10
     state.braking = input.brake || reversing
     if (state.braking) {
       speed = approach(speed, 0, (input.brake ? 16 : 9) * dt)
     } else if (input.throttle !== 0 && state.battery > 0) {
-      const target = input.throttle * (input.throttle < 0 ? 3 : boost ? 15 : 10)
-      const acceleration = Math.abs(speed) > Math.abs(target) ? 3.2 : boost ? 9.5 : 6.8
+      const target = input.throttle * (input.throttle < 0 ? 3 : forwardTopSpeed)
+      const acceleration = Math.abs(speed) > Math.abs(target) ? 3.2 : boost ? 9.5 : lowBattery ? 4.8 : 6.8
       speed = approach(speed, target, acceleration * dt)
     } else {
       speed = approach(speed, 0, (1.1 + Math.abs(speed) * 0.12) * dt)
@@ -132,7 +138,7 @@ export class RiderController {
     if (Math.abs(input.steering) > 0 && Math.abs(speed) > 4 && !state.braking) {
       speed *= Math.exp(-0.18 * Math.abs(state.steeringAngle) * dt)
     }
-    const speedLimit = Math.max(Math.hypot(state.velocityX, state.velocityZ), input.throttle < 0 ? 3 : boost ? 15 : 10)
+    const speedLimit = Math.max(Math.hypot(state.velocityX, state.velocityZ), input.throttle < 0 ? 3 : forwardTopSpeed)
     const grip = this.touchingWall ? 0 : input.brake ? 3 : 14
     const lateralSpeed = (state.velocityX * forwardZ - state.velocityZ * forwardX) * Math.exp(-grip * dt)
     state.velocityX = forwardX * speed + forwardZ * lateralSpeed
@@ -163,7 +169,7 @@ export class RiderController {
       const effortRate = 0.12 + activeOrders * 0.05 + (state.boosting ? 0.55 : 0)
       state.stamina = Math.max(0, state.stamina - effortRate * dt)
     } else if (Math.abs(state.speed) < 0.15 && !state.colliding) {
-      state.stamina = Math.min(100, state.stamina + 1.8 * dt)
+      state.stamina = Math.min(100, state.stamina + 2.4 * dt)
     }
     const standTarget = Math.abs(state.speed) < 0.65 ? 1 : 0
     state.standLeg += (standTarget - state.standLeg) * (1 - Math.exp(-8.5 * dt))

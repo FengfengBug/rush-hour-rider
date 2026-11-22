@@ -62,7 +62,17 @@ export class GameEngine {
   private readonly followCamera = new FollowCamera(CITY_LAYOUT.buildings)
   private readonly controller = new RiderController(CITY_LAYOUT)
   private readonly dust = buildBrakeDust()
-  private readonly traffic = new TrafficSystem(CITY_LAYOUT, (event) => console.info('交通事件', event))
+  private readonly traffic = new TrafficSystem(CITY_LAYOUT, (event) => {
+    if (event.type === 'red-light') {
+      const { fineCents, messageText } = this.eventSystem.handleRedLightViolation()
+      if (fineCents > 0) {
+        this.orders.recordOperatingExpense(fineCents, 'payment', messageText, '交警提示')
+      } else {
+        this.orders.addSystemMessage('交警提示', 'system', messageText)
+      }
+      this.lastSnapshotTime = 0
+    }
+  })
   private readonly trafficVisuals: ReturnType<typeof buildTrafficVisuals>
   private readonly navigation = new NavigationSystem(CITY_LAYOUT, RIDER_COLLISION_RADIUS)
   private readonly orders = new OrderManager(CITY_LAYOUT)
@@ -92,6 +102,8 @@ export class GameEngine {
   private distractionPhaseTime = 0
   private distractedElapsedSec = 0
   private distractionWarningCount = 0
+  private batterySwapStationId: string | null = null
+  private batterySwapElapsed = 0
   private readonly reducedMotionQuery: MediaQueryList | null
   private previewTime = 0
   private wheelAngle = 0
@@ -298,6 +310,16 @@ export class GameEngine {
     else this.lastSnapshotTime = 0
   }
 
+  resolveIncomingCall(choice: 0 | 1 | 2) {
+    if (this.view !== 'ride' || document.hidden || this.shiftEnded || this.eventSystem.hasActiveEvent) return
+    const result = this.eventSystem.resolveIncomingCall(choice)
+    if (result) {
+      this.orders.addSystemMessage(result.orderId, result.messageKind, result.messageText)
+      this.lastSnapshotTime = 0
+    }
+    this.focusCanvas()
+  }
+
   enterNearbyBuilding(): boolean {
     if (this.view !== 'ride' || document.hidden || this.shiftEnded || this.eventSystem.hasActiveEvent || this.interior.mode !== 'none') {
       return false
@@ -368,7 +390,88 @@ export class GameEngine {
     return best ? { landmark: best.landmark, theme: best.theme } : null
   }
 
+  private updateBatterySwap(stepSeconds: number): void {
+    const state = this.controller.state
+    const station = CITY_LAYOUT.batteryStations.find((entry) => {
+      const dist = Math.hypot(state.x - entry.access.position.x, state.z - entry.access.position.z)
+      return dist <= Math.max(3.6, entry.access.radius + 0.8)
+    })
+    if (!station || Math.abs(state.speed) >= 1.2) {
+      if (this.batterySwapStationId !== null || this.batterySwapElapsed > 0) {
+        this.batterySwapStationId = null
+        this.batterySwapElapsed = 0
+        this.eventSystem.setBatterySwap(null)
+        this.lastSnapshotTime = 0
+      } else {
+        this.eventSystem.setBatterySwap(null)
+      }
+      return
+    }
+    const durationSec = 3.0
+    const feeCents = 200
+    if (state.battery >= 98) {
+      this.batterySwapStationId = station.id
+      this.batterySwapElapsed = 0
+      this.eventSystem.setBatterySwap({
+        stationId: station.id,
+        stationName: station.name,
+        progress: 1,
+        durationSec,
+        feeCents,
+        alreadyFull: true,
+      })
+      return
+    }
+    if (this.batterySwapStationId !== station.id) {
+      this.batterySwapStationId = station.id
+      this.batterySwapElapsed = 0
+    }
+    this.batterySwapElapsed = Math.min(durationSec, this.batterySwapElapsed + stepSeconds)
+    if (this.batterySwapElapsed >= durationSec) {
+      this.controller.refillBattery()
+      this.orders.recordOperatingExpense(
+        feeCents,
+        'payment',
+        `在${station.name}换电柜更换满电电池（电量 100%，运营成本 -¥2.00）。`,
+        '换电柜',
+      )
+      this.eventSystem.recordBatterySwap(station.name)
+      this.batterySwapStationId = null
+      this.batterySwapElapsed = 0
+      this.lastSnapshotTime = 0
+      return
+    }
+    this.eventSystem.setBatterySwap({
+      stationId: station.id,
+      stationName: station.name,
+      progress: this.batterySwapElapsed / durationSec,
+      durationSec,
+      feeCents,
+      alreadyFull: false,
+    })
+  }
+
   private applyEventResolution(resolution: EventResolution) {
+    if (resolution.action === 'accept-addon') {
+      if (resolution.addonMerchantId && resolution.addonDeliveryId && resolution.addonFeeCents) {
+        this.orders.acceptAddonOrder(
+          resolution.addonMerchantId,
+          resolution.addonDeliveryId,
+          resolution.addonFeeCents,
+          this.controller.state,
+        )
+        this.syncOrderNavigation()
+      }
+      this.lastSnapshotTime = 0
+      this.focusCanvas()
+      return
+    }
+    if (resolution.action === 'decline-addon') {
+      this.orders.addSystemMessage(resolution.orderId, resolution.messageKind, resolution.messageText)
+      this.lastSnapshotTime = 0
+      this.focusCanvas()
+      return
+    }
     if (resolution.staminaCost > 0) this.controller.consumeStamina(resolution.staminaCost)
     this.orders.applyEventResolution(resolution)
     this.syncOrderNavigation()
@@ -413,6 +516,8 @@ export class GameEngine {
     this.distractionPhaseTime = 0
     this.distractedElapsedSec = 0
     this.distractionWarningCount = 0
+    this.batterySwapStationId = null
+    this.batterySwapElapsed = 0
     this.setCityView('ride')
     this.lastSnapshotTime = 0
   }
@@ -518,6 +623,23 @@ export class GameEngine {
       return
     }
     if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, button, a, summary, [contenteditable="true"]')) return
+    if (this.view === 'ride' && !this.shiftEnded && this.eventSystem.hasIncomingCall && !event.repeat) {
+      if (event.code === 'Digit1' || event.code === 'Numpad1') {
+        event.preventDefault()
+        this.resolveIncomingCall(0)
+        return
+      }
+      if (event.code === 'Digit2' || event.code === 'Numpad2') {
+        event.preventDefault()
+        this.resolveIncomingCall(1)
+        return
+      }
+      if (event.code === 'Digit3' || event.code === 'Numpad3') {
+        event.preventDefault()
+        this.resolveIncomingCall(2)
+        return
+      }
+    }
     if (this.interior.mode === 'walk') {
       if (event.code === 'KeyE') {
         event.preventDefault()
@@ -605,7 +727,13 @@ export class GameEngine {
         this.orders.updateInterior(stepSeconds, this.controller.state)
         const forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'))
         const strafe = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'))
-        const shouldAutoExit = this.interior.update(stepSeconds, { forward, strafe })
+        this.eventSystem.setLiveTelemetry({
+          waitingAtRed: false,
+          dt: stepSeconds,
+          battery: this.controller.state.battery,
+          stamina: this.controller.state.stamina,
+        })
+        const shouldAutoExit = this.interior.update(stepSeconds, { forward, strafe }, this.controller.state.stamina <= 20)
         if (shouldAutoExit) this.exitBuilding()
         if (this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
           this.shiftElapsed = SHIFT_DURATION_SECONDS
@@ -658,12 +786,20 @@ export class GameEngine {
       const impact = this.traffic.checkCollision(state, this.distractionLevel)
       if (impact) this.controller.applyTrafficImpact(impact.normalX, impact.normalZ, impact.distance, this.distractionLevel)
       this.traffic.checkSignals(previousPosition, state)
+      const waitingAtRed = this.traffic.isWaitingAtRedLight(state)
+      this.eventSystem.setLiveTelemetry({
+        waitingAtRed,
+        dt: stepSeconds,
+        battery: state.battery,
+        stamina: state.stamina,
+      })
+      this.updateBatterySwap(stepSeconds)
       const orderRevision = this.orders.revision
       const intercepted = this.orders.update(
         stepSeconds,
         previousPosition,
         state,
-        this.traffic.isWaitingAtRedLight(state),
+        waitingAtRed,
         (check) => {
           const triggered = this.eventSystem.tryTriggerArrival(
             check.phase,
@@ -681,6 +817,31 @@ export class GameEngine {
           return triggered
         },
       )
+      if (!intercepted && !this.eventSystem.hasActiveEvent && !this.eventSystem.hasIncomingCall) {
+        if (this.orders.activeOrders.length === 2) {
+          const addonCandidate = this.orders.findAddonCandidate(state)
+          if (addonCandidate && this.eventSystem.tryTriggerAddonOffer(addonCandidate.merchant, addonCandidate.destination, 2)) {
+            this.clearInput()
+            this.distractionActive = false
+            this.distractionLevel = 0
+            this.lastSnapshotTime = 0
+          }
+        }
+        if (!this.eventSystem.hasActiveEvent) {
+          const urgentOrder = this.orders.activeOrders.find((order) => {
+            const rem = order.deadline - this.orders.elapsedSeconds
+            return rem <= 18 && rem > -10
+          })
+          if (urgentOrder) {
+            const triggeredCall = this.eventSystem.tryTriggerIncomingCall(
+              urgentOrder.id,
+              this.orders.getLandmarkName(urgentOrder.deliveryId),
+              urgentOrder.ledger.merchantDelaySec > 0,
+            )
+            if (triggeredCall) this.lastSnapshotTime = 0
+          }
+        }
+      }
       if (orderRevision !== this.orders.revision) this.syncOrderNavigation()
       this.navigationElapsed += stepSeconds
       if (this.navigationElapsed >= 0.1) {
@@ -747,7 +908,12 @@ export class GameEngine {
       this.sampleStartedAt = time
     }
     const eventSnapshot = this.eventSystem.getSnapshot()
-    const snapshotInterval = eventSnapshot.active?.sprint?.active || this.interior.photoFlash > 0 ? 33 : 100
+    const snapshotInterval =
+      eventSnapshot.active?.sprint?.active
+      || (eventSnapshot.batterySwap !== null && !eventSnapshot.batterySwap.alreadyFull)
+      || this.interior.photoFlash > 0
+        ? 33
+        : 100
     if (time - this.lastSnapshotTime >= snapshotInterval) {
       const state = this.controller.state
       const nearbyEnterable = this.interior.mode === 'none' && this.view === 'ride' && !this.shiftEnded && !eventBlocking

@@ -300,6 +300,7 @@ export interface OrderSnapshot {
   completed: readonly DeliveryOrder[]
   priorityId: string | null
   incomeCents: number
+  operatingCostCents: number
   paused: boolean
   notice: string
 }
@@ -326,6 +327,25 @@ export type GameEventKind =
   | 'cbd-elevator-jam'
   | 'wrong-pin-address'
   | 'locker-full'
+  | 'addon-order'
+
+export interface IncomingCallState {
+  readonly id: number
+  readonly orderId: string
+  readonly deliveryName: string
+  readonly remainingSec: number
+  readonly durationSec: number
+  readonly hasMerchantDelay: boolean
+}
+
+export interface BatterySwapState {
+  readonly stationId: string
+  readonly stationName: string
+  readonly progress: number
+  readonly durationSec: number
+  readonly feeCents: number
+  readonly alreadyFull: boolean
+}
 
 export type EventLedgerKey = 'merchantDelaySec' | 'lastMileSec' | 'detourSec'
 
@@ -376,8 +396,15 @@ export interface EventOutcome {
 
 export interface EventSnapshot {
   readonly active: ActiveGameEvent | null
+  readonly incomingCall: IncomingCallState | null
+  readonly batterySwap: BatterySwapState | null
   readonly latestOutcome: EventOutcome | null
+  readonly waitingAtRedLightSec: number
+  readonly lowBatteryWarning: boolean
+  readonly staminaExhausted: boolean
   readonly triggeredCount: number
+  readonly batterySwapCount: number
+  readonly violationFineCents: number
   readonly reputation: number
   readonly goodReviews: number
   readonly badReviews: number

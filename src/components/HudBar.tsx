@@ -56,6 +56,7 @@ export function HudBar({
   const activeCount = orders?.active.length ?? 0
   const onTimeCount = completed.filter((order) => order.settlement?.onTime).length
   const onTimeRate = completedCount > 0 ? Math.round((onTimeCount / completedCount) * 100) : null
+  const reputation = snapshot?.events.reputation ?? 100
 
   const battery = rider ? Math.max(0, Math.min(100, rider.battery)) : 100
   const stamina = rider ? Math.max(0, Math.min(100, rider.stamina)) : 100
@@ -117,6 +118,15 @@ export function HudBar({
           >
             <span className="hud-label">准时率</span>
             <strong className="hud-value">{onTimeRate !== null ? `${onTimeRate}%` : '—'}</strong>
+          </div>
+
+          <div
+            className="hud-metric hud-metric--reputation"
+            data-low={reputation < 80}
+            title={`骑手信誉 ${reputation}%（安抚催单/好评加分，闯红灯/差评/转单扣分）`}
+          >
+            <span className="hud-label">信誉</span>
+            <strong className="hud-value">{reputation}%</strong>
           </div>
 
           <div

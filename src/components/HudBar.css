@@ -185,7 +185,8 @@
   color: #8b5418;
 }
 
-.hud-metric--ontime[data-low="true"] .hud-value {
+.hud-metric--ontime[data-low="true"] .hud-value,
+.hud-metric--reputation[data-low="true"] .hud-value {
   color: #b33a35;
 }
 

@@ -1,22 +1,27 @@
 import type {
   ActiveGameEvent,
+  BatterySwapState,
   BuildingKind,
   CityLandmark,
   EventLedgerKey,
   EventOutcome,
   EventSnapshot,
   GameEventKind,
+  IncomingCallState,
 } from './types'
 
 const EVENT_COOLDOWN_SEC = 10
+const ADDON_COOLDOWN_SEC = 45
+const MAX_ADDON_OFFERS = 2
+const INCOMING_CALL_SEC = 12.0
 const SPRINT_DURATION_SEC = 3.0
 const OUTCOME_TOAST_SEC = 3.8
 
 export interface EventResolution {
   readonly orderId: string
   readonly phase: 'pickup' | 'delivery'
-  readonly action: 'complete-pickup' | 'complete-delivery' | 'transfer-order'
-  readonly ledgerKey: EventLedgerKey
+  readonly action: 'complete-pickup' | 'complete-delivery' | 'transfer-order' | 'accept-addon' | 'decline-addon'
+  readonly ledgerKey: EventLedgerKey | null
   readonly timeCostSec: number
   readonly staminaCost: number
   readonly tipCents: number
@@ -24,11 +29,20 @@ export interface EventResolution {
   readonly messageKind: 'system' | 'merchant' | 'customer' | 'rider'
   readonly messageText: string
   readonly outcome: EventOutcome
+  readonly addonMerchantId?: string
+  readonly addonDeliveryId?: string
+  readonly addonFeeCents?: number
 }
 
 interface InternalEvent {
   readonly view: ActiveGameEvent
   readonly riderStaminaAtStart: number
+  readonly addonMeta?: {
+    merchantId: string
+    deliveryId: string
+    feeCents: number
+    deliveryName: string
+  }
   sprint: {
     active: boolean
     taps: number
@@ -202,6 +216,37 @@ function buildEventCard(
         ],
         sprint: null,
       }
+    case 'addon-order':
+      return {
+        instanceId,
+        kind,
+        phase,
+        orderId,
+        landmarkId: landmark.id,
+        landmarkName: name,
+        badge: `系统派单 · 顺路加单`,
+        title: '高价顺路加单弹窗',
+        description: `系统监测到你手中已有 2 单，强推一单「${name}」高价顺路加单，接单可赚 ¥9.00，但三单并跑极易连环超时。`,
+        options: [
+          {
+            id: 'a',
+            keyHint: '1',
+            label: '接下顺路高价单',
+            summary: '立即加入在途第 3 单，跑赢准时拿高薪',
+            tags: ['基础费 ¥9.00', '三单并跑高压'],
+            tone: 'action',
+          },
+          {
+            id: 'b',
+            keyHint: '2',
+            label: '稳妥拒绝加单',
+            summary: '保住当前两单准时率，拒绝无扣款无惩罚',
+            tags: ['稳保准时率', '零惩罚'],
+            tone: 'safe',
+          },
+        ],
+        sprint: null,
+      }
   }
 }
 
@@ -209,46 +254,236 @@ export class EventSystem {
   private seed = 3107
   private instanceSeq = 0
   private outcomeSeq = 0
+  private callSeq = 0
   private activeEvent: InternalEvent | null = null
+  private incomingCall: IncomingCallState | null = null
+  private batterySwap: BatterySwapState | null = null
   private latestOutcome: EventOutcome | null = null
   private cooldownSec = 0
+  private addonCooldownSec = 14
+  private addonOfferCount = 0
+  private waitingAtRedLightSec = 0
+  private lowBatteryWarning = false
+  private staminaExhausted = false
   private triggeredCount = 0
+  private batterySwapCount = 0
+  private violationFineCents = 0
   private reputation = 100
   private goodReviews = 0
   private badReviews = 0
   private transferredCount = 0
   private readonly seenKinds = new Set<GameEventKind>()
   private readonly handledStages = new Set<string>()
+  private readonly calledOrderIds = new Set<string>()
 
   reset(): void {
     this.seed = 3107
     this.instanceSeq = 0
     this.outcomeSeq = 0
+    this.callSeq = 0
     this.activeEvent = null
+    this.incomingCall = null
+    this.batterySwap = null
     this.latestOutcome = null
     this.cooldownSec = 0
+    this.addonCooldownSec = 14
+    this.addonOfferCount = 0
+    this.waitingAtRedLightSec = 0
+    this.lowBatteryWarning = false
+    this.staminaExhausted = false
     this.triggeredCount = 0
+    this.batterySwapCount = 0
+    this.violationFineCents = 0
     this.reputation = 100
     this.goodReviews = 0
     this.badReviews = 0
     this.transferredCount = 0
     this.seenKinds.clear()
     this.handledStages.clear()
+    this.calledOrderIds.clear()
   }
 
   get hasActiveEvent(): boolean {
     return this.activeEvent !== null
   }
 
+  get hasIncomingCall(): boolean {
+    return this.incomingCall !== null
+  }
+
   updateRidingCooldown(deltaSeconds: number): void {
     if (this.cooldownSec > 0) {
       this.cooldownSec = Math.max(0, this.cooldownSec - deltaSeconds)
+    }
+    if (this.addonCooldownSec > 0) {
+      this.addonCooldownSec = Math.max(0, this.addonCooldownSec - deltaSeconds)
+    }
+    if (this.incomingCall) {
+      const nextRemaining = this.incomingCall.remainingSec - deltaSeconds
+      if (nextRemaining <= 0) {
+        const missed = this.incomingCall
+        this.incomingCall = null
+        this.reputation = Math.max(0, this.reputation - 2)
+        this.pushOutcome({
+          kind: 'wrong-pin-address',
+          orderId: missed.orderId,
+          title: '未接顾客催单电话',
+          summary: `${missed.orderId} 催单铃响超时未接 · 信誉 -2%`,
+          tone: 'warn',
+        })
+      } else {
+        this.incomingCall = { ...this.incomingCall, remainingSec: nextRemaining }
+      }
     }
     if (this.latestOutcome) {
       const nextRemaining = this.latestOutcome.remainingSec - deltaSeconds
       this.latestOutcome = nextRemaining > 0
         ? { ...this.latestOutcome, remainingSec: nextRemaining }
         : null
+    }
+  }
+
+  setLiveTelemetry(params: { waitingAtRed: boolean; dt: number; battery: number; stamina: number }): void {
+    this.waitingAtRedLightSec = params.waitingAtRed ? this.waitingAtRedLightSec + params.dt : 0
+    this.lowBatteryWarning = params.battery < 20
+    this.staminaExhausted = params.stamina <= 20
+  }
+
+  setBatterySwap(state: BatterySwapState | null): void {
+    this.batterySwap = state
+  }
+
+  recordBatterySwap(stationName: string): void {
+    this.batterySwapCount += 1
+    this.batterySwap = null
+    this.pushOutcome({
+      kind: 'addon-order',
+      orderId: '换电柜',
+      title: '换电完成 · 电量 100%',
+      summary: `${stationName}换电柜满电出发 · 运营成本 -¥2.00`,
+      moneyDeltaCents: -200,
+      tone: 'good',
+    })
+  }
+
+  handleRedLightViolation(): { fineCents: number; messageText: string } {
+    this.reputation = Math.max(0, this.reputation - 5)
+    const fined = this.random() < 0.65
+    const fineCents = fined ? 200 : 0
+    if (fined) this.violationFineCents += fineCents
+    const messageText = fined
+      ? '路口闯红灯被电子抓拍罚款 ¥2.00（信誉 -5%），请宁等三秒不抢一秒！'
+      : '险些与横向车流剐蹭！闯红灯被系统记录安全警告（信誉 -5%）。'
+    this.pushOutcome({
+      kind: 'addon-order',
+      orderId: '交警提示',
+      title: fined ? '闯红灯违章罚款！' : '闯红灯安全警告！',
+      summary: fined ? '电子抓拍扣款 -¥2.00 · 信誉 -5%' : '险些剐蹭 · 记录一次违章 · 信誉 -5%',
+      moneyDeltaCents: -fineCents,
+      tone: 'warn',
+    })
+    return { fineCents, messageText }
+  }
+
+  tryTriggerAddonOffer(merchant: CityLandmark, delivery: CityLandmark, activeCount: number): boolean {
+    if (activeCount !== 2 || this.activeEvent || this.incomingCall || this.addonCooldownSec > 0 || this.addonOfferCount >= MAX_ADDON_OFFERS) {
+      return false
+    }
+    this.addonOfferCount += 1
+    this.addonCooldownSec = ADDON_COOLDOWN_SEC
+    this.triggeredCount += 1
+    const landmark: CityLandmark = { ...merchant, name: `${merchant.name} → ${delivery.name}` }
+    const view = buildEventCard(++this.instanceSeq, 'addon-order', 'pickup', '加单', landmark)
+    this.activeEvent = {
+      view,
+      riderStaminaAtStart: 100,
+      addonMeta: {
+        merchantId: merchant.id,
+        deliveryId: delivery.id,
+        feeCents: 900,
+        deliveryName: delivery.name,
+      },
+      sprint: null,
+    }
+    return true
+  }
+
+  tryTriggerIncomingCall(orderId: string, deliveryName: string, hasMerchantDelay: boolean): boolean {
+    if (this.activeEvent || this.incomingCall || this.calledOrderIds.has(orderId)) return false
+    this.calledOrderIds.add(orderId)
+    this.triggeredCount += 1
+    this.incomingCall = {
+      id: ++this.callSeq,
+      orderId,
+      deliveryName,
+      remainingSec: INCOMING_CALL_SEC,
+      durationSec: INCOMING_CALL_SEC,
+      hasMerchantDelay,
+    }
+    return true
+  }
+
+  resolveIncomingCall(choice: 0 | 1 | 2): { orderId: string; messageKind: 'rider' | 'customer' | 'system'; messageText: string } | null {
+    const call = this.incomingCall
+    if (!call) return null
+    this.incomingCall = null
+    if (choice === 0) {
+      this.reputation = Math.min(100, this.reputation + 2)
+      this.goodReviews += 1
+      this.pushOutcome({
+        kind: 'wrong-pin-address',
+        orderId: call.orderId,
+        title: '已安抚催单顾客',
+        summary: `${call.orderId} 诚恳致歉获顾客理解 · 信誉 +2%`,
+        tone: 'good',
+      })
+      return {
+        orderId: call.orderId,
+        messageKind: 'customer',
+        messageText: `顾客回复：没事师傅，路上慢点注意安全，到了放门口就行！`,
+      }
+    }
+    if (choice === 1) {
+      if (call.hasMerchantDelay) {
+        this.reputation = Math.min(100, this.reputation + 1)
+        this.pushOutcome({
+          kind: 'merchant-backlog',
+          orderId: call.orderId,
+          title: '已同步商家卡餐情况',
+          summary: `${call.orderId} 顾客理解出餐慢 · 信誉 +1%`,
+          tone: 'good',
+        })
+        return {
+          orderId: call.orderId,
+          messageKind: 'rider',
+          messageText: `已向顾客说明商家午高峰出餐排队，顾客表示理解。`,
+        }
+      }
+      this.pushOutcome({
+        kind: 'merchant-backlog',
+        orderId: call.orderId,
+        title: '已说明正在赶路',
+        summary: `${call.orderId} 顾客表示再等几分钟`,
+        tone: 'neutral',
+      })
+      return {
+        orderId: call.orderId,
+        messageKind: 'rider',
+        messageText: `已向${call.deliveryName}顾客说明路口较堵，正在加速赶往。`,
+      }
+    }
+    this.reputation = Math.max(0, this.reputation - 3)
+    this.pushOutcome({
+      kind: 'wrong-pin-address',
+      orderId: call.orderId,
+      title: '已静音专注骑行',
+      summary: `挂断 ${call.orderId} 催单来电保安全 · 信誉 -3%`,
+      tone: 'warn',
+    })
+    return {
+      orderId: call.orderId,
+      messageKind: 'system',
+      messageText: `骑行中静音挂断了${call.orderId}催单来电以专注看路（信誉 -3%）。`,
     }
   }
 
@@ -296,6 +531,7 @@ export class EventSystem {
     this.triggeredCount += 1
 
     const view = buildEventCard(++this.instanceSeq, chosen, phase, orderId, landmark)
+    this.incomingCall = null
     this.activeEvent = { view, riderStaminaAtStart: riderStamina, sprint: null }
     return true
   }
@@ -305,12 +541,51 @@ export class EventSystem {
     if (!current || current.sprint?.active) return null
     const { kind, orderId, phase, landmarkName } = current.view
 
+    if (kind === 'addon-order') {
+      const meta = current.addonMeta!
+      if (choiceIndex === 0) {
+        return this.commitResolution({
+          orderId,
+          phase,
+          action: 'accept-addon',
+          ledgerKey: null,
+          timeCostSec: 0,
+          staminaCost: 0,
+          tipCents: 0,
+          eventPenaltyCents: 0,
+          messageKind: 'system',
+          messageText: `已接下系统高价顺路加单（送往${meta.deliveryName}，基础费 ¥9.00），三单并跑请抓紧节奏！`,
+          outcomeTitle: '已接高价顺路加单',
+          outcomeSummary: `新增第 3 单 · 基础费 ¥9.00 · 注意合理规划路线`,
+          tone: 'good',
+          addonMerchantId: meta.merchantId,
+          addonDeliveryId: meta.deliveryId,
+          addonFeeCents: meta.feeCents,
+        })
+      }
+      return this.commitResolution({
+        orderId,
+        phase,
+        action: 'decline-addon',
+        ledgerKey: null,
+        timeCostSec: 0,
+        staminaCost: 0,
+        tipCents: 0,
+        eventPenaltyCents: 0,
+        messageKind: 'rider',
+        messageText: `已稳妥拒绝高价顺路加单，专心保住手上两单的准时率。`,
+        outcomeTitle: '已拒绝顺路加单',
+        outcomeSummary: '稳妥保准时 · 无扣款无惩罚',
+        tone: 'neutral',
+      })
+    }
+
     if (kind === 'luxury-compound-no-ebike' && choiceIndex === 0) {
-      const exhausted = current.riderStaminaAtStart < 15
+      const exhausted = current.riderStaminaAtStart <= 20
       current.sprint = {
         active: true,
         taps: 0,
-        targetTaps: exhausted ? 12 : 10,
+        targetTaps: exhausted ? 13 : 10,
         remainingSec: SPRINT_DURATION_SEC,
         durationSec: SPRINT_DURATION_SEC,
       }
@@ -527,12 +802,42 @@ export class EventSystem {
       : null
     return {
       active,
+      incomingCall: this.incomingCall ? { ...this.incomingCall } : null,
+      batterySwap: this.batterySwap ? { ...this.batterySwap } : null,
       latestOutcome: this.latestOutcome ? { ...this.latestOutcome } : null,
+      waitingAtRedLightSec: this.waitingAtRedLightSec,
+      lowBatteryWarning: this.lowBatteryWarning,
+      staminaExhausted: this.staminaExhausted,
       triggeredCount: this.triggeredCount,
+      batterySwapCount: this.batterySwapCount,
+      violationFineCents: this.violationFineCents,
       reputation: this.reputation,
       goodReviews: this.goodReviews,
       badReviews: this.badReviews,
       transferredCount: this.transferredCount,
+    }
+  }
+
+  private pushOutcome(params: {
+    kind: GameEventKind
+    orderId: string
+    title: string
+    summary: string
+    moneyDeltaCents?: number
+    tone: EventOutcome['tone']
+  }): void {
+    this.latestOutcome = {
+      id: ++this.outcomeSeq,
+      kind: params.kind,
+      orderId: params.orderId,
+      title: params.title,
+      summary: params.summary,
+      ledgerKey: null,
+      timeCostSec: 0,
+      staminaDelta: 0,
+      moneyDeltaCents: params.moneyDeltaCents ?? 0,
+      tone: params.tone,
+      remainingSec: OUTCOME_TOAST_SEC,
     }
   }
 
@@ -567,7 +872,7 @@ export class EventSystem {
     orderId: string
     phase: 'pickup' | 'delivery'
     action: EventResolution['action']
-    ledgerKey: EventLedgerKey
+    ledgerKey: EventLedgerKey | null
     timeCostSec: number
     staminaCost: number
     tipCents: number
@@ -577,6 +882,9 @@ export class EventSystem {
     outcomeTitle: string
     outcomeSummary: string
     tone: EventOutcome['tone']
+    addonMerchantId?: string
+    addonDeliveryId?: string
+    addonFeeCents?: number
   }): EventResolution {
     const kind = this.activeEvent!.view.kind
     const outcome: EventOutcome = {
@@ -607,6 +915,9 @@ export class EventSystem {
       messageKind: params.messageKind,
       messageText: params.messageText,
       outcome,
+      addonMerchantId: params.addonMerchantId,
+      addonDeliveryId: params.addonDeliveryId,
+      addonFeeCents: params.addonFeeCents,
     }
   }
 
