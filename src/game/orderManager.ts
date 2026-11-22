@@ -329,7 +329,7 @@ export class OrderManager {
     const merchant = this.landmarks.get(merchantId)!.access.position
     const delivery = this.landmarks.get(deliveryId)!.access.position
     const idealDistance = distance(rider, merchant) + distance(merchant, delivery)
-    return { idealDistance, idealSec: Math.max(25, Math.ceil(idealDistance / 8 + 12)) }
+    return { idealDistance, idealSec: Math.max(34, Math.ceil(idealDistance / 6.8 + 18)) }
   }
 
   private createOffer(merchant: CityLandmark, destination: CityLandmark, rider: Point2, at: number): void {

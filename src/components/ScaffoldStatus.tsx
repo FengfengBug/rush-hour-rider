@@ -214,6 +214,7 @@ export function ScaffoldStatus({
               <span><kbd>Tab</kbd> 收放手机</span>
               <span><kbd>C</kbd> 切镜头</span>
               <span><kbd>H</kbd> 鸣笛（波纹）</span>
+              <span><kbd>鼠标拖拽</kbd> 自由视角（滚轮缩放 · 双击回正）</span>
             </p>
             <p className="horn-note">鸣笛仅显示波纹，暂无声音。</p>
             <p className="desktop-hint">需实体键盘，建议使用电脑体验。</p>
@@ -328,7 +329,7 @@ export function ScaffoldStatus({
       <footer className="scene-footer">
         <div className="scene-caption">
           <h2><Sun size={14} aria-hidden="true" />看清方向，再出发。</h2>
-          <p>午高峰 11:30–13:30 · 低头看屏请先减速</p>
+          <p>鼠标拖拽自由环视 · 滚轮缩放 · 双击/C 键回正</p>
         </div>
         <div className="engine-summary">
           <span className="engine-state" data-ready={snapshot !== null}>{snapshot ? '引擎运行中' : '正在初始化'}</span>

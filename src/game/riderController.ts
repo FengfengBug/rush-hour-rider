@@ -43,7 +43,7 @@ export class RiderController {
     this.state = {
       x: this.spawn.position.x, z: this.spawn.position.z, heading: FACING[this.spawn.facing],
       speed: 0, velocityX: 0, velocityZ: 0, steeringAngle: 0, leanAngle: 0,
-      wheelTravel: 0, distance: 0, battery: 100, stamina: 100, braking: false, boosting: false, colliding: false,
+      wheelTravel: 0, distance: 0, battery: 100, stamina: 100, standLeg: 1, braking: false, boosting: false, colliding: false,
     }
   }
 
@@ -51,7 +51,7 @@ export class RiderController {
     this.stop()
     Object.assign(this.state, {
       x: this.spawn.position.x, z: this.spawn.position.z, heading: FACING[this.spawn.facing],
-      wheelTravel: 0, distance: 0, battery: 100, stamina: 100,
+      wheelTravel: 0, distance: 0, battery: 100, stamina: 100, standLeg: 1,
     })
   }
 
@@ -63,7 +63,7 @@ export class RiderController {
     this.touchingWall = false
     Object.assign(this.state, {
       speed: 0, velocityX: 0, velocityZ: 0, steeringAngle: 0, leanAngle: 0,
-      braking: false, boosting: false, colliding: false,
+      standLeg: 1, braking: false, boosting: false, colliding: false,
     })
   }
 
@@ -115,19 +115,25 @@ export class RiderController {
     }
 
     const steeringScale = 1 - 0.42 * distraction
-    const steeringResponse = 9 - 4.8 * distraction
+    const steeringResponse = 11 - 5.6 * distraction
     const driftBias = distraction > 0 && Math.abs(speed) > 1.2
       ? Math.sin(distractionTime * 2.2) * 0.055 * distraction * Math.min(1, Math.abs(speed) / 8)
       : 0
-    const steeringTarget = (input.steering * 0.5 * steeringScale + driftBias) / (1 + Math.abs(speed) * 0.18)
+    // 贴合真实两轮电驴转弯几何：低速大舵角灵活掉头，高速随车速自然收窄保持稳定。
+    const maxSteerAngle = 0.74
+    const speedSteerDamp = 1 + Math.abs(speed) * 0.145 + Math.pow(Math.abs(speed) / 14, 2) * 0.45
+    const steeringTarget = (input.steering * maxSteerAngle * steeringScale + driftBias) / speedSteerDamp
     state.steeringAngle += (steeringTarget - state.steeringAngle) * (1 - Math.exp(-steeringResponse * dt))
-    const yawRate = speed * Math.tan(state.steeringAngle) / 1.6
+    const yawRate = speed * Math.tan(state.steeringAngle) / 1.28
     state.heading += yawRate * dt
     state.heading = Math.atan2(Math.sin(state.heading), Math.cos(state.heading))
     const forwardX = Math.sin(state.heading)
     const forwardZ = Math.cos(state.heading)
+    if (Math.abs(input.steering) > 0 && Math.abs(speed) > 4 && !state.braking) {
+      speed *= Math.exp(-0.18 * Math.abs(state.steeringAngle) * dt)
+    }
     const speedLimit = Math.max(Math.hypot(state.velocityX, state.velocityZ), input.throttle < 0 ? 3 : boost ? 15 : 10)
-    const grip = this.touchingWall ? 0 : input.brake ? 3 : 13
+    const grip = this.touchingWall ? 0 : input.brake ? 3 : 14
     const lateralSpeed = (state.velocityX * forwardZ - state.velocityZ * forwardX) * Math.exp(-grip * dt)
     state.velocityX = forwardX * speed + forwardZ * lateralSpeed
     state.velocityZ = forwardZ * speed - forwardX * lateralSpeed
@@ -159,8 +165,14 @@ export class RiderController {
     } else if (Math.abs(state.speed) < 0.15 && !state.colliding) {
       state.stamina = Math.min(100, state.stamina + 1.8 * dt)
     }
-    const targetLean = Math.max(-0.35, Math.min(0.35, -Math.atan(state.speed * yawRate / 9.81) * 0.55))
-    state.leanAngle += (targetLean - state.leanAngle) * (1 - Math.exp(-8 * dt))
+    const standTarget = Math.abs(state.speed) < 0.65 ? 1 : 0
+    state.standLeg += (standTarget - state.standLeg) * (1 - Math.exp(-8.5 * dt))
+    if (state.standLeg < 0.002) state.standLeg = 0
+    if (state.standLeg > 0.998) state.standLeg = 1
+    const rideLean = Math.max(-0.36, Math.min(0.36, -Math.atan(state.speed * yawRate / 9.81) * 0.52))
+    const standLean = -0.075 * state.standLeg * (1 - Math.min(1, Math.abs(state.speed) / 0.8))
+    const targetLean = rideLean + standLean
+    state.leanAngle += (targetLean - state.leanAngle) * (1 - Math.exp(-8.5 * dt))
   }
 
   private move(dx: number, dz: number, dt: number) {

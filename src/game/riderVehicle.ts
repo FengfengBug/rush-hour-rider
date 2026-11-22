@@ -23,6 +23,7 @@ export interface RiderVisualState {
   steeringAngle: number
   leanAngle: number
   braking: boolean
+  standLeg?: number
 }
 
 export const RIDER_WHEEL_RADIUS = 0.34
@@ -196,11 +197,35 @@ export function buildRiderVehicle() {
   box(lean, navy, [0, 1.44, -0.338], [0.36, 0.4, 0.04], [0.14, 0, 0])
   for (const side of [-1, 1]) {
     box(lean, reflector, [side * 0.13, 1.5, -0.373], [0.048, 0.39, 0.016], [0.14, 0, 0])
-    bar(lean, navy, [side * 0.15, 1.09, -0.2], [side * 0.24, 0.74, 0.3], 0.11)
-    bar(lean, navy, [side * 0.24, 0.74, 0.3], [side * 0.24, 0.43, 0.17], 0.085)
-    box(lean, rubber, [side * 0.235, 0.39, 0.24], [0.18, 0.12, 0.35])
-    box(lean, reflector, [side * 0.235, 0.348, 0.24], [0.19, 0.028, 0.36])
   }
+  // 右腿保持在脚踏板上（静态合批），左腿（+X）作为可活动支腿在停驻时伸出撑地平衡。
+  bar(lean, navy, [-0.15, 1.09, -0.2], [-0.24, 0.74, 0.3], 0.11)
+  bar(lean, navy, [-0.24, 0.74, 0.3], [-0.24, 0.43, 0.17], 0.085)
+  box(lean, rubber, [-0.235, 0.39, 0.24], [0.18, 0.12, 0.35])
+  box(lean, reflector, [-0.235, 0.348, 0.24], [0.19, 0.028, 0.36])
+
+  const leftHip = new Vector3(0.15, 1.09, -0.2)
+  const leftKneeRide = new Vector3(0.24, 0.74, 0.3)
+  const leftKneeStand = new Vector3(0.45, 0.56, 0.06)
+  const leftAnkleRide = new Vector3(0.24, 0.43, 0.17)
+  const leftAnkleStand = new Vector3(0.54, 0.15, 0.01)
+  const leftShoeRide = new Vector3(0.235, 0.39, 0.24)
+  const leftShoeStand = new Vector3(0.55, 0.115, 0.08)
+  const leftSoleRide = new Vector3(0.235, 0.348, 0.24)
+  const leftSoleStand = new Vector3(0.55, 0.068, 0.08)
+  const leftKneeWork = new Vector3()
+  const leftAnkleWork = new Vector3()
+
+  const supportThigh = bar(lean, navy, [0.15, 1.09, -0.2], [0.24, 0.74, 0.3], 0.11)
+  supportThigh.name = 'left-support-thigh'
+  const supportKnee = piece(lean, sphere, navy, [0.24, 0.74, 0.3], [0.105, 0.105, 0.105])
+  supportKnee.name = 'left-support-knee'
+  const supportShin = bar(lean, navy, [0.24, 0.74, 0.3], [0.24, 0.43, 0.17], 0.085)
+  supportShin.name = 'left-support-shin'
+  const supportShoe = box(lean, rubber, [0.235, 0.39, 0.24], [0.18, 0.12, 0.35])
+  supportShoe.name = 'left-support-shoe'
+  const supportSole = box(lean, reflector, [0.235, 0.348, 0.24], [0.19, 0.028, 0.36])
+  supportSole.name = 'left-support-sole'
   box(lean, reflector, [0, 1.32, -0.344], [0.37, 0.058, 0.019], [0.14, 0, 0])
   piece(lean, cylinder, skin, [0, 1.82, -0.1], [0.095, 0.18, 0.095])
   piece(lean, sphere, skin, [0, 1.96, -0.05], [0.215, 0.24, 0.21])
@@ -221,7 +246,15 @@ export function buildRiderVehicle() {
     piece(steering, sphere, rubber, [side * 0.37, 1.29, -0.16], [0.082, 0.075, 0.09])
   }
 
-  const articulatedMeshes = new Set<Mesh>([brakeLens, ...forearms.map((arm) => arm.mesh)])
+  const articulatedMeshes = new Set<Mesh>([
+    brakeLens,
+    supportThigh,
+    supportKnee,
+    supportShin,
+    supportShoe,
+    supportSole,
+    ...forearms.map((arm) => arm.mesh),
+  ])
   for (const group of [lean, steering, frontWheel, rearWheel]) {
     const batches = new Map<Material, BufferGeometry[]>()
     for (const child of [...group.children]) {
@@ -244,18 +277,30 @@ export function buildRiderVehicle() {
 
   return {
     root,
-    update({ wheelAngle, steeringAngle, leanAngle, braking }: RiderVisualState) {
+    update({ wheelAngle, steeringAngle, leanAngle, braking, standLeg = 0 }: RiderVisualState) {
+      const visualSteer = Math.max(-0.56, Math.min(0.56, steeringAngle))
       frontWheel.rotation.x = wheelAngle
       rearWheel.rotation.x = wheelAngle
-      steering.rotation.y = steeringAngle
+      steering.rotation.y = visualSteer
       lean.rotation.z = leanAngle
       taillight.color.set(braking ? '#ff5548' : '#ac3435')
       taillight.emissiveIntensity = braking ? 2.8 : 0.18
       for (const arm of forearms) {
         const x = arm.side * 0.37
-        arm.hand.set(x * Math.cos(steeringAngle) - 0.16 * Math.sin(steeringAngle), 1.29, 0.8 - x * Math.sin(steeringAngle) - 0.16 * Math.cos(steeringAngle))
+        arm.hand.set(x * Math.cos(visualSteer) - 0.16 * Math.sin(visualSteer), 1.29, 0.8 - x * Math.sin(visualSteer) - 0.16 * Math.cos(visualSteer))
         fitBar(arm.mesh, arm.elbow, arm.hand, 0.082)
       }
+      const clampedStand = Math.max(0, Math.min(1, standLeg))
+      const t = clampedStand * clampedStand * (3 - 2 * clampedStand)
+      leftKneeWork.lerpVectors(leftKneeRide, leftKneeStand, t)
+      leftAnkleWork.lerpVectors(leftAnkleRide, leftAnkleStand, t)
+      fitBar(supportThigh, leftHip, leftKneeWork, 0.11)
+      supportKnee.position.copy(leftKneeWork)
+      fitBar(supportShin, leftKneeWork, leftAnkleWork, 0.085)
+      supportShoe.position.lerpVectors(leftShoeRide, leftShoeStand, t)
+      supportShoe.rotation.set(0, 0.24 * t, 0.075 * t)
+      supportSole.position.lerpVectors(leftSoleRide, leftSoleStand, t)
+      supportSole.rotation.set(0, 0.24 * t, 0.075 * t)
     },
     dispose() {
       geometries.forEach((entry) => entry.dispose())

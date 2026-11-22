@@ -25,6 +25,7 @@ export interface RiderSnapshot {
   speed: number
   battery: number
   stamina: number
+  standLeg: number
   distance: number
   braking: boolean
   boosting: boolean

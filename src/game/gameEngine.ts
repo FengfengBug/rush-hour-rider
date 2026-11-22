@@ -97,6 +97,9 @@ export class GameEngine {
   private fps = 0
   private viewportWidth = 1
   private viewportHeight = 1
+  private orbitPointerId: number | null = null
+  private orbitLastX = 0
+  private orbitLastY = 0
 
   constructor(container: HTMLElement, onSnapshot: (snapshot: EngineSnapshot) => void) {
     this.container = container
@@ -109,7 +112,8 @@ export class GameEngine {
     this.renderer.shadowMap.type = PCFShadowMap
     this.renderer.domElement.tabIndex = 0
     this.renderer.domElement.setAttribute('role', 'img')
-    this.renderer.domElement.setAttribute('aria-label', '外卖骑手驾驶场景，WASD或方向键骑行，空格急刹，Shift冲刺，C切换跟随视角，H鸣笛波纹')
+    this.renderer.domElement.setAttribute('aria-label', '外卖骑手驾驶场景，WASD或方向键骑行，空格急刹，Shift冲刺，鼠标拖拽自由视角，滚轮缩放，C切换视角，H鸣笛')
+    this.renderer.domElement.style.cursor = 'grab'
     this.container.append(this.renderer.domElement)
 
     this.scene.background = new Color('#dce7d5')
@@ -148,13 +152,21 @@ export class GameEngine {
     window.addEventListener('keyup', this.onKeyUp)
     window.addEventListener('blur', this.clearInput)
     document.addEventListener('visibilitychange', this.onVisibilityChange)
-    this.renderer.domElement.addEventListener('pointerdown', this.focusCanvas)
+    this.renderer.domElement.addEventListener('pointerdown', this.onCanvasPointerDown)
+    this.renderer.domElement.addEventListener('pointermove', this.onCanvasPointerMove)
+    this.renderer.domElement.addEventListener('pointerup', this.onCanvasPointerUp)
+    this.renderer.domElement.addEventListener('pointercancel', this.onCanvasPointerUp)
+    this.renderer.domElement.addEventListener('wheel', this.onCanvasWheel, { passive: false })
+    this.renderer.domElement.addEventListener('dblclick', this.onCanvasDoubleClick)
+    this.renderer.domElement.addEventListener('contextmenu', this.onCanvasContextMenu)
     this.resize()
   }
 
   setCityView(view: CityView) {
     this.clearInput()
+    this.endOrbitDrag()
     this.view = view
+    this.renderer.domElement.style.cursor = view === 'ride' ? 'grab' : 'default'
     this.riderPreview = 'parked'
     this.previewTime = 0
     this.dust.clear()
@@ -329,7 +341,8 @@ export class GameEngine {
     if (this.view === 'ride') this.setCityView('rider-rear')
     this.riderPreview = mode
     this.previewTime = 0
-    this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: 0, leanAngle: 0, braking: mode === 'braking' })
+    const standLeg = mode === 'motion' ? 0 : 1
+    this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: 0, leanAngle: mode === 'motion' ? 0 : -0.075, braking: mode === 'braking', standLeg })
     this.sunlight.shadow.needsUpdate = true
   }
 
@@ -353,7 +366,13 @@ export class GameEngine {
     window.removeEventListener('keyup', this.onKeyUp)
     window.removeEventListener('blur', this.clearInput)
     document.removeEventListener('visibilitychange', this.onVisibilityChange)
-    this.renderer.domElement.removeEventListener('pointerdown', this.focusCanvas)
+    this.renderer.domElement.removeEventListener('pointerdown', this.onCanvasPointerDown)
+    this.renderer.domElement.removeEventListener('pointermove', this.onCanvasPointerMove)
+    this.renderer.domElement.removeEventListener('pointerup', this.onCanvasPointerUp)
+    this.renderer.domElement.removeEventListener('pointercancel', this.onCanvasPointerUp)
+    this.renderer.domElement.removeEventListener('wheel', this.onCanvasWheel)
+    this.renderer.domElement.removeEventListener('dblclick', this.onCanvasDoubleClick)
+    this.renderer.domElement.removeEventListener('contextmenu', this.onCanvasContextMenu)
     this.keys.clear()
     this.controls.dispose()
     this.dust.dispose()
@@ -371,9 +390,70 @@ export class GameEngine {
 
   readonly focusCanvas = () => this.renderer.domElement.focus({ preventScroll: true })
 
+  private endOrbitDrag() {
+    if (this.orbitPointerId !== null) {
+      try {
+        if (this.renderer.domElement.hasPointerCapture(this.orbitPointerId)) {
+          this.renderer.domElement.releasePointerCapture(this.orbitPointerId)
+        }
+      } catch {
+        // Ignore if pointer capture is already released.
+      }
+      this.orbitPointerId = null
+    }
+    this.followCamera.setDragging(false)
+    this.renderer.domElement.style.cursor = this.view === 'ride' ? 'grab' : 'default'
+  }
+
+  private readonly onCanvasPointerDown = (event: PointerEvent) => {
+    this.focusCanvas()
+    if (this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
+    if (event.button !== 0 && event.button !== 2) return
+    this.orbitPointerId = event.pointerId
+    this.orbitLastX = event.clientX
+    this.orbitLastY = event.clientY
+    this.followCamera.setDragging(true)
+    this.renderer.domElement.style.cursor = 'grabbing'
+    try {
+      this.renderer.domElement.setPointerCapture(event.pointerId)
+    } catch {
+      // Synthetic pointer events in tests may not support capture.
+    }
+  }
+
+  private readonly onCanvasPointerMove = (event: PointerEvent) => {
+    if (this.orbitPointerId !== event.pointerId || this.view !== 'ride') return
+    const dx = event.clientX - this.orbitLastX
+    const dy = event.clientY - this.orbitLastY
+    this.orbitLastX = event.clientX
+    this.orbitLastY = event.clientY
+    this.followCamera.orbitBy(dx, dy)
+  }
+
+  private readonly onCanvasPointerUp = (event: PointerEvent) => {
+    if (this.orbitPointerId !== event.pointerId) return
+    this.endOrbitDrag()
+  }
+
+  private readonly onCanvasWheel = (event: WheelEvent) => {
+    if (this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
+    event.preventDefault()
+    this.followCamera.zoomBy(event.deltaY)
+  }
+
+  private readonly onCanvasDoubleClick = () => {
+    if (this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
+    this.followCamera.resetOrbit()
+  }
+
+  private readonly onCanvasContextMenu = (event: MouseEvent) => {
+    if (this.view === 'ride') event.preventDefault()
+  }
+
   private readonly clearInput = () => {
     this.keys.clear()
     this.controller.stop()
+    this.endOrbitDrag()
     this.hornRemaining = 0
     this.trafficVisuals.clearHorn()
   }
@@ -412,7 +492,13 @@ export class GameEngine {
     this.rider.root.position.set(state.x, onSidewalk ? 0.24 : inBlock ? 0.16 : 0, state.z)
     this.rider.root.rotation.y = state.heading
     this.wheelAngle = state.wheelTravel / RIDER_WHEEL_RADIUS % (Math.PI * 2)
-    this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: state.steeringAngle, leanAngle: state.leanAngle, braking: state.braking })
+    this.rider.update({
+      wheelAngle: this.wheelAngle,
+      steeringAngle: state.steeringAngle,
+      leanAngle: state.leanAngle,
+      braking: state.braking,
+      standLeg: state.standLeg,
+    })
   }
 
   private readonly resize = () => {
@@ -517,6 +603,7 @@ export class GameEngine {
         state,
         state.heading,
         stepSeconds,
+        state.speed,
         intercepted ? 0 : this.distractionLevel,
         this.distractionPhaseTime,
         this.reducedMotionQuery?.matches ?? false,
@@ -540,7 +627,7 @@ export class GameEngine {
         const sprintResolution = this.eventSystem.updateModal(deltaSeconds)
         if (sprintResolution) this.applyEventResolution(sprintResolution)
       }
-      this.followCamera.update(this.controller.state, this.controller.state.heading, deltaSeconds, 0, 0, true)
+      this.followCamera.update(this.controller.state, this.controller.state.heading, deltaSeconds, 0, 0, 0, true)
     } else {
       this.distractionActive = false
       this.distractionLevel = 0
@@ -548,7 +635,7 @@ export class GameEngine {
         this.previewTime += deltaSeconds
         this.wheelAngle = (this.wheelAngle + deltaSeconds * 3.2 / RIDER_WHEEL_RADIUS) % (Math.PI * 2)
         const turn = Math.sin(this.previewTime * 1.3)
-        this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: turn * 0.16, leanAngle: -turn * 0.2, braking: false })
+        this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: turn * 0.16, leanAngle: -turn * 0.2, braking: false, standLeg: 0 })
         this.sunlight.shadow.needsUpdate = true
       }
       this.controls.update(deltaSeconds)
@@ -592,7 +679,7 @@ export class GameEngine {
         events: eventSnapshot,
         rider: {
           x: state.x, z: state.z, heading: state.heading, speed: state.speed,
-          battery: state.battery, stamina: state.stamina, distance: state.distance, braking: state.braking,
+          battery: state.battery, stamina: state.stamina, standLeg: state.standLeg, distance: state.distance, braking: state.braking,
           boosting: state.boosting, colliding: this.collisionDisplayTime > 0,
         },
         traffic: this.traffic.getSnapshot(state, this.hornRemaining > 0),
