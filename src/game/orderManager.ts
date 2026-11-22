@@ -48,6 +48,7 @@ export class OrderManager {
   private priorityId: string | null = null
   private incomeCents = 0
   private operatingCostCents = 0
+  private raining = false
   private notice = '开工了，选择一单开始配送。'
 
   constructor(layout: CityLayout) {
@@ -72,6 +73,7 @@ export class OrderManager {
     this.priorityId = null
     this.incomeCents = 0
     this.operatingCostCents = 0
+    this.raining = false
     this.notice = '开工了，选择一单开始配送。'
     const nearby = [...this.merchants].sort((a, b) => distance(a.access.position, this.spawn) - distance(b.access.position, this.spawn))
     const usedDestinations = new Set<string>()
@@ -390,21 +392,27 @@ export class OrderManager {
     this.revision += 1
   }
 
+  setRaining(raining: boolean): void {
+    this.raining = raining
+  }
+
   private settleOrder(order: DeliveryOrder, at: number): void {
     order.status = 'completed'
     order.completedAt = at
     const lateSec = Math.max(0, at - order.deadline)
     const onTime = lateSec <= 0.0000001
     const bonusCents = onTime ? 150 : 0
+    const rainBonusCents = this.raining ? 200 : 0
     const penaltyCents = onTime ? 0 : Math.min(order.baseFeeCents, Math.ceil(lateSec - 0.0000001) * 5)
     const tipCents = order.tipCents
     const eventPenaltyCents = order.eventPenaltyCents
-    const totalCents = Math.max(0, order.baseFeeCents + bonusCents + tipCents - penaltyCents - eventPenaltyCents)
+    const totalCents = Math.max(0, order.baseFeeCents + bonusCents + rainBonusCents + tipCents - penaltyCents - eventPenaltyCents)
     order.settlement = {
       onTime,
       lateSec: onTime ? 0 : lateSec,
       baseFeeCents: order.baseFeeCents,
       bonusCents,
+      rainBonusCents,
       tipCents,
       penaltyCents,
       eventPenaltyCents,
@@ -415,6 +423,7 @@ export class OrderManager {
     const extras: string[] = []
     if (onTime) extras.push('含准时奖 ¥1.50')
     else extras.push(`超时扣款 ¥${(penaltyCents / 100).toFixed(2)}`)
+    if (rainBonusCents > 0) extras.push(`雨天补贴 +¥${(rainBonusCents / 100).toFixed(2)}`)
     if (tipCents > 0) extras.push(`顾客小费 +¥${(tipCents / 100).toFixed(2)}`)
     if (eventPenaltyCents > 0) extras.push(`异常/差评扣款 −¥${(eventPenaltyCents / 100).toFixed(2)}`)
     this.notice = `${order.id} 已送达，实得 ¥${(totalCents / 100).toFixed(2)}。`

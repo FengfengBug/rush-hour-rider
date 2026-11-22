@@ -12,6 +12,7 @@ export interface DrivingInput {
   distraction?: number
   distractionTime?: number
   activeOrderCount?: number
+  rainIntensity?: number
 }
 
 export interface RiderState extends RiderSnapshot {
@@ -104,6 +105,7 @@ export class RiderController {
     const distraction = Math.max(0, Math.min(1, input.distraction ?? 0))
     const distractionTime = input.distractionTime ?? 0
     const activeOrders = Math.max(0, input.activeOrderCount ?? 0)
+    const rain = Math.max(0, Math.min(1, input.rainIntensity ?? 0))
     let speed = state.velocityX * Math.sin(state.heading) + state.velocityZ * Math.cos(state.heading)
     const reversing = input.throttle * speed < -0.1
     const lowBattery = state.battery > 0 && state.battery < 20
@@ -111,7 +113,9 @@ export class RiderController {
     const forwardTopSpeed = lowBattery ? 6.2 : boost ? 15 : 10
     state.braking = input.brake || reversing
     if (state.braking) {
-      speed = approach(speed, 0, (input.brake ? 16 : 9) * dt)
+      // 雨天路面湿滑：刹车减速度降低约 36%，制动距离明显变长但线性可控。
+      const brakeDecel = (input.brake ? 16 : 9) * (1 - 0.36 * rain)
+      speed = approach(speed, 0, brakeDecel * dt)
     } else if (input.throttle !== 0 && state.battery > 0) {
       const target = input.throttle * (input.throttle < 0 ? 3 : forwardTopSpeed)
       const acceleration = Math.abs(speed) > Math.abs(target) ? 3.2 : boost ? 9.5 : lowBattery ? 4.8 : 6.8
@@ -139,7 +143,9 @@ export class RiderController {
       speed *= Math.exp(-0.18 * Math.abs(state.steeringAngle) * dt)
     }
     const speedLimit = Math.max(Math.hypot(state.velocityX, state.velocityZ), input.throttle < 0 ? 3 : forwardTopSpeed)
-    const grip = this.touchingWall ? 0 : input.brake ? 3 : 14
+    // 雨天降低侧向轮胎抓地力，过弯带有柔和可控的轻微甩尾滑移。
+    const baseGrip = this.touchingWall ? 0 : input.brake ? 3 : 14
+    const grip = baseGrip * (1 - (input.brake ? 0.42 : 0.62) * rain)
     const lateralSpeed = (state.velocityX * forwardZ - state.velocityZ * forwardX) * Math.exp(-grip * dt)
     state.velocityX = forwardX * speed + forwardZ * lateralSpeed
     state.velocityZ = forwardZ * speed - forwardX * lateralSpeed

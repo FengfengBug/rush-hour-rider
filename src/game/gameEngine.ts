@@ -25,6 +25,7 @@ import { buildNavigationVisuals } from './navigationVisuals'
 import { OrderManager } from './orderManager'
 import { EventSystem, type EventResolution } from './eventSystem'
 import { InteriorScene } from './interiorScene'
+import { WeatherSystem } from './weatherSystem'
 import type { CityLandmark, CityView, Direction, EngineSnapshot, InteriorTheme, NavigationFrameListener, OrderReportReason, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
@@ -78,6 +79,7 @@ export class GameEngine {
   private readonly orders = new OrderManager(CITY_LAYOUT)
   private readonly eventSystem = new EventSystem()
   private readonly interior = new InteriorScene()
+  private readonly weather = new WeatherSystem()
   private readonly enterableLandmarks: readonly { landmark: CityLandmark; theme: InteriorTheme }[]
   private readonly navigationVisuals: ReturnType<typeof buildNavigationVisuals>
   private navigationFrameListener: NavigationFrameListener | null = null
@@ -87,6 +89,7 @@ export class GameEngine {
   private readonly renderer: WebGLRenderer
   private readonly controls: OrbitControls
   private readonly resizeObserver: ResizeObserver
+  private readonly hemiLight = new HemisphereLight('#fff7e6', '#859a80', 1.8)
   private readonly sunlight = new DirectionalLight('#fff0ce', 2.7)
   private readonly world: ReturnType<typeof buildWorld>
   private readonly rider: ReturnType<typeof buildRiderVehicle>
@@ -133,7 +136,7 @@ export class GameEngine {
 
     this.scene.background = new Color('#dce7d5')
     this.scene.fog = new Fog('#dce7d5', 950, 2000)
-    this.scene.add(new HemisphereLight('#fff7e6', '#859a80', 1.8))
+    this.scene.add(this.hemiLight)
     this.sunlight.castShadow = true
     this.sunlight.shadow.mapSize.set(2048, 2048)
     this.sunlight.shadow.camera.near = 30
@@ -156,7 +159,7 @@ export class GameEngine {
     this.trafficVisuals = buildTrafficVisuals(CITY_LAYOUT, this.traffic.signals, this.traffic.vehicles)
     this.navigationVisuals = buildNavigationVisuals(this.navigation.targets)
     this.syncOrderNavigation()
-    this.scene.add(this.rider.root, this.dust.root, this.trafficVisuals.root, this.navigationVisuals.root)
+    this.scene.add(this.rider.root, this.dust.root, this.trafficVisuals.root, this.navigationVisuals.root, this.weather.root)
     this.updateRider()
 
     this.controls = new OrbitControls(this.previewCamera, this.renderer.domElement)
@@ -258,6 +261,12 @@ export class GameEngine {
     if (this.muted === muted) return
     this.muted = muted
     this.lastSnapshotTime = 0
+  }
+
+  toggleWeather() {
+    this.weather.toggleManualWeather()
+    this.lastSnapshotTime = 0
+    this.focusCanvas()
   }
 
   setPhoneOpen(open: boolean) {
@@ -501,6 +510,7 @@ export class GameEngine {
 
   resetRider() {
     this.interior.exit()
+    this.weather.reset()
     this.controller.reset()
     this.orders.reset()
     this.eventSystem.reset()
@@ -563,6 +573,7 @@ export class GameEngine {
     this.navigationVisuals.dispose()
     this.rider.dispose()
     this.interior.dispose()
+    this.weather.dispose()
     this.world.dispose()
     this.sunlight.shadow.dispose()
     this.scene.clear()
@@ -687,6 +698,7 @@ export class GameEngine {
       leanAngle: state.leanAngle,
       braking: state.braking,
       standLeg: state.standLeg,
+      headlightIntensity: this.weather.intensity,
     })
   }
 
@@ -781,6 +793,7 @@ export class GameEngine {
         distraction: this.distractionLevel,
         distractionTime: this.distractionPhaseTime,
         activeOrderCount: this.orders.activeTargetIds.length,
+        rainIntensity: this.weather.intensity,
       })
       const state = this.controller.state
       const impact = this.traffic.checkCollision(state, this.distractionLevel)
@@ -892,9 +905,19 @@ export class GameEngine {
       }
       this.controls.update(deltaSeconds)
     }
+    this.weather.update(deltaSeconds, this.shiftElapsed / SHIFT_DURATION_SECONDS, this.controller.state, this.interior.mode === 'none')
+    this.weather.applyAtmosphere(
+      this.scene,
+      this.sunlight,
+      this.hemiLight,
+      (intensity) => this.world.setStreetLampGlow(intensity),
+      this.view === 'ride',
+    )
+    this.orders.setRaining(this.weather.isRaining)
     if (this.interior.mode !== 'none') {
       this.renderer.render(this.interior.scene, this.interior.camera)
     } else {
+      if (!shiftActive || eventBlocking) this.updateRider()
       this.navigationVisuals.update(deltaSeconds, this.controller.state, this.navigation.snapshot, this.view === 'ride')
       this.navigationFrameListener?.(this.controller.state, this.navigation.snapshot)
       this.world.updateCanopyOcclusion(this.followCamera.camera.position, this.view === 'ride' ? this.rider.root.position : null, deltaSeconds)
@@ -960,6 +983,7 @@ export class GameEngine {
           photoFlash: this.interior.photoFlash,
           photoSuccessText: this.interior.photoSuccessText,
         },
+        weather: this.weather.getSnapshot(),
         rider: {
           x: state.x, z: state.z, heading: state.heading, speed: state.speed,
           battery: state.battery, stamina: state.stamina, standLeg: state.standLeg, distance: state.distance, braking: state.braking,

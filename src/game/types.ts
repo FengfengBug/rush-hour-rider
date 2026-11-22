@@ -259,9 +259,10 @@ export interface OrderSettlement {
   lateSec: number
   baseFeeCents: number
   bonusCents: number
+  rainBonusCents: number
   tipCents: number
-  penaltyCents: number
   eventPenaltyCents: number
+  penaltyCents: number
   totalCents: number
 }
 
@@ -433,6 +434,16 @@ export interface InteriorSnapshot {
   readonly photoSuccessText: string | null
 }
 
+export type WeatherMode = 'auto' | 'clear' | 'rain'
+
+export interface WeatherSnapshot {
+  readonly mode: WeatherMode
+  readonly raining: boolean
+  readonly intensity: number
+  readonly label: string
+  readonly rainBonusCents: number
+}
+
 export interface EngineSnapshot {
   view: CityView
   cameraMode: RideCameraMode
@@ -442,6 +453,7 @@ export interface EngineSnapshot {
   distraction: DistractionSnapshot
   events: EventSnapshot
   interior: InteriorSnapshot
+  weather: WeatherSnapshot
   rider: RiderSnapshot
   traffic: TrafficSnapshot
   navigation: NavigationSnapshot

@@ -53,6 +53,10 @@ export default function App() {
     engine?.cycleRideCameraMode()
   }
 
+  function toggleWeather() {
+    engine?.toggleWeather()
+  }
+
   function toggleMute() {
     setMuted((current) => !current)
   }
@@ -86,6 +90,7 @@ export default function App() {
         onRiderPreviewChange={selectRiderPreview}
         onCameraChange={selectCamera}
         onCycleCamera={cycleCamera}
+        onToggleWeather={toggleWeather}
         onToggleMute={toggleMute}
         onResetRider={resetRider}
       />

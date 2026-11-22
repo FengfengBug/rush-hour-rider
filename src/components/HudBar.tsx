@@ -3,10 +3,12 @@ import {
   BatteryCharging,
   Bike,
   Clock,
+  CloudRain,
   Eye,
   Flag,
   HeartPulse,
   RotateCcw,
+  Sun,
   Volume2,
   VolumeX,
 } from 'lucide-react'
@@ -18,6 +20,7 @@ interface HudBarProps {
   snapshot: EngineSnapshot | null
   muted: boolean
   onCycleCamera: () => void
+  onToggleWeather: () => void
   onToggleMute: () => void
   onResetRider: () => void
 }
@@ -41,6 +44,7 @@ export function HudBar({
   snapshot,
   muted,
   onCycleCamera,
+  onToggleWeather,
   onToggleMute,
   onResetRider,
 }: HudBarProps) {
@@ -49,7 +53,9 @@ export function HudBar({
   const orders = snapshot?.orders
   const distraction = snapshot?.distraction
   const traffic = snapshot?.traffic
+  const weather = snapshot?.weather
   const cameraMode = snapshot?.cameraMode ?? 'near'
+  const raining = weather?.raining ?? false
 
   const completed = orders?.completed ?? []
   const completedCount = completed.length
@@ -160,7 +166,23 @@ export function HudBar({
           </div>
         </div>
 
-        <div className="hud-actions" role="group" aria-label="视角与音效控制">
+        <div className="hud-actions" role="group" aria-label="天气、视角与音效控制">
+          <button
+            className="hud-action-btn hud-action-btn--weather"
+            type="button"
+            disabled={!snapshot}
+            data-raining={raining}
+            title={raining ? '当前午后阵雨（路面湿滑 · 送达自动附加雨天补贴 +¥2.00），点击可切换晴天' : '当前晴朗微风（班次中段自动触发阵雨），点击可手动切换阵雨'}
+            aria-label={raining ? '切换为晴天' : '切换为阵雨天气'}
+            onClick={(event) => {
+              onToggleWeather()
+              if (event.detail > 0) (event.currentTarget as HTMLButtonElement).blur()
+            }}
+          >
+            {raining ? <CloudRain size={14} aria-hidden="true" /> : <Sun size={14} aria-hidden="true" />}
+            <span>{raining ? '阵雨 +¥2' : '晴朗'}</span>
+          </button>
+
           <button
             className="hud-action-btn"
             type="button"

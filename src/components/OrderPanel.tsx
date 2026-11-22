@@ -39,6 +39,7 @@ export function CompletedBill({ order }: { order: DeliveryOrder }) {
         {settlement && <dl className="order-panel-metrics">
           <div><dt>基础费</dt><dd>{money(settlement.baseFeeCents)}</dd></div>
           <div><dt>准时奖</dt><dd>+{money(settlement.bonusCents)}</dd></div>
+          {settlement.rainBonusCents > 0 && <div><dt>雨天补贴</dt><dd>+{money(settlement.rainBonusCents)}</dd></div>}
           <div><dt>超时扣款</dt><dd>−{money(settlement.penaltyCents)}</dd></div>
           {settlement.tipCents > 0 && <div><dt>顾客小费</dt><dd>+{money(settlement.tipCents)}</dd></div>}
           {settlement.eventPenaltyCents > 0 && <div><dt>异常/差评扣款</dt><dd>−{money(settlement.eventPenaltyCents)}</dd></div>}

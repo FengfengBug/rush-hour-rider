@@ -305,6 +305,17 @@
   background: #f8e3de;
 }
 
+.hud-bar .hud-action-btn--weather[data-raining="true"] {
+  border-color: #6b9cb2;
+  color: #1d4e66;
+  background: #e1f1f8;
+}
+
+.hud-bar .hud-action-btn--weather[data-raining="true"]:hover:not(:disabled) {
+  border-color: #4f849c;
+  background: #d0e8f4;
+}
+
 .hud-bar .hud-action-btn:focus-visible {
   outline: 2px solid #2b6451;
   outline-offset: 2px;

@@ -1,8 +1,11 @@
 import {
+  AdditiveBlending,
   BoxGeometry,
   BufferGeometry,
   CanvasTexture,
+  CircleGeometry,
   Color,
+  ConeGeometry,
   CylinderGeometry,
   DynamicDrawUsage,
   Group,
@@ -316,6 +319,7 @@ export function buildWorld(layout: CityLayout) {
     put(furniture, x, 0.24, z, 1.45, 0.16, 1.45, '#b5b795')
   }
 
+  const lampPositions: { x: number; z: number }[] = []
   layout.sidewalks.forEach((sidewalk, index) => {
     const b = sidewalk.bounds
     const alongX = b.maxX - b.minX > b.maxZ - b.minZ
@@ -338,6 +342,7 @@ export function buildWorld(layout: CityLayout) {
       put(furniture, x + nx, 7.1, z + nz, nx ? 2.2 : 0.2, 0.22, nz ? 2.2 : 0.2, '#52665f')
       put(furniture, x + nx * 2, 6.95, z + nz * 2, nx ? 1.3 : 0.65, 0.3, nz ? 1.3 : 0.65, '#40544d')
       put(markings, x + nx * 2, 6.77, z + nz * 2, nx ? 1.05 : 0.48, 0.035, nz ? 1.05 : 0.48, '#ffe9b0')
+      lampPositions.push({ x: x + nx * 2, z: z + nz * 2 })
     }
   })
 
@@ -433,9 +438,60 @@ export function buildWorld(layout: CityLayout) {
   signMesh.name = 'chinese-signs'
   root.add(signMesh)
 
+  // 雨天/黄昏街灯暖黄光锥与地面光晕合批（零 PointLight 开销，仅 2 次绘制调用）
+  const lampConeGeometry = new ConeGeometry(3.4, 6.5, 10, 1, true)
+  const lampConeMaterial = new MeshBasicMaterial({
+    color: '#ffd984',
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: AdditiveBlending,
+  })
+  const lampCones = new InstancedMesh(lampConeGeometry, lampConeMaterial, Math.max(1, lampPositions.length))
+  lampCones.name = 'streetlamp-cones'
+  lampCones.visible = false
+
+  const lampPoolGeometry = new CircleGeometry(3.8, 12)
+  lampPoolGeometry.rotateX(-Math.PI / 2)
+  const lampPoolMaterial = new MeshBasicMaterial({
+    color: '#ffcf6e',
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: AdditiveBlending,
+  })
+  const lampPools = new InstancedMesh(lampPoolGeometry, lampPoolMaterial, Math.max(1, lampPositions.length))
+  lampPools.name = 'streetlamp-pools'
+  lampPools.visible = false
+
+  const lampObj = new Object3D()
+  lampPositions.forEach((pos, idx) => {
+    lampObj.position.set(pos.x, 3.55, pos.z)
+    lampObj.rotation.set(0, 0, 0)
+    lampObj.scale.set(1, 1, 1)
+    lampObj.updateMatrix()
+    lampCones.setMatrixAt(idx, lampObj.matrix)
+    lampObj.position.set(pos.x, 0.08, pos.z)
+    lampObj.updateMatrix()
+    lampPools.setMatrixAt(idx, lampObj.matrix)
+  })
+  lampCones.instanceMatrix.needsUpdate = true
+  lampPools.instanceMatrix.needsUpdate = true
+  root.add(lampCones, lampPools)
+
   return {
     root,
     instanceCount,
+    setStreetLampGlow(intensity: number) {
+      const clamped = Math.max(0, Math.min(1, intensity))
+      const on = clamped > 0.03
+      lampCones.visible = on
+      lampPools.visible = on
+      if (on) {
+        lampConeMaterial.opacity = clamped * 0.14
+        lampPoolMaterial.opacity = clamped * 0.24
+      }
+    },
     updateCanopyOcclusion(cameraPosition: Vector3, riderPosition: Vector3 | null, deltaSeconds: number) {
       let distance = 0
       if (riderPosition) {
@@ -462,8 +518,8 @@ export function buildWorld(layout: CityLayout) {
     },
     dispose() {
       for (const child of root.children) if (child instanceof InstancedMesh) child.dispose()
-      for (const geometry of [boxGeometry, planeGeometry, trunkGeometry, crownGeometry, signGeometry]) geometry.dispose()
-      for (const material of [matte, canopyMaterial, glass, unlit, signMaterial]) material.dispose()
+      for (const geometry of [boxGeometry, planeGeometry, trunkGeometry, crownGeometry, signGeometry, lampConeGeometry, lampPoolGeometry]) geometry.dispose()
+      for (const material of [matte, canopyMaterial, glass, unlit, signMaterial, lampConeMaterial, lampPoolMaterial]) material.dispose()
       atlas.dispose()
       root.clear()
       root.removeFromParent()

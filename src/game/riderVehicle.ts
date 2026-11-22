@@ -1,7 +1,10 @@
 import {
+  AdditiveBlending,
   BoxGeometry,
   BufferGeometry,
   CanvasTexture,
+  CircleGeometry,
+  ConeGeometry,
   CylinderGeometry,
   Group,
   Material,
@@ -24,6 +27,7 @@ export interface RiderVisualState {
   leanAngle: number
   braking: boolean
   standLeg?: number
+  headlightIntensity?: number
 }
 
 export const RIDER_WHEEL_RADIUS = 0.34
@@ -154,7 +158,40 @@ export function buildRiderVehicle() {
     for (const x of [-0.25, 0.25]) box(steering, navy, [x, 1.16, 0.22 + slat * 0.085], [0.018, 0.25, 0.018])
   }
   box(steering, rubber, [0, 0.92, 0.24], [0.31, 0.17, 0.17])
-  box(steering, headlight, [0, 0.92, 0.331], [0.25, 0.115, 0.025])
+  const headlightLens = box(steering, headlight, [0, 0.92, 0.331], [0.25, 0.115, 0.025])
+  headlightLens.name = 'headlight-lens'
+  const beamGeometry = geometry(new ConeGeometry(1.45, 7.6, 12, 1, true))
+  const beamMaterial = new MeshBasicMaterial({
+    color: '#fff1b8',
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: AdditiveBlending,
+  })
+  materials.add(beamMaterial)
+  const headlightBeam = new Mesh(beamGeometry, beamMaterial)
+  headlightBeam.name = 'headlight-beam'
+  headlightBeam.position.set(0, 0.62, 4.1)
+  headlightBeam.rotation.set(-Math.PI / 2 + 0.08, 0, 0)
+  headlightBeam.visible = false
+  steering.add(headlightBeam)
+
+  const roadPoolGeometry = geometry(new CircleGeometry(1.85, 14))
+  roadPoolGeometry.rotateX(-Math.PI / 2)
+  const roadPoolMaterial = new MeshBasicMaterial({
+    color: '#ffe9a6',
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: AdditiveBlending,
+  })
+  materials.add(roadPoolMaterial)
+  const headlightPool = new Mesh(roadPoolGeometry, roadPoolMaterial)
+  headlightPool.name = 'headlight-pool'
+  headlightPool.position.set(0, 0.08, 5.2)
+  headlightPool.scale.set(1.0, 1.0, 1.85)
+  headlightPool.visible = false
+  steering.add(headlightPool)
   box(lean, rubber, [0, 0.83, -1.33], [0.38, 0.15, 0.06])
   const brakeLens = box(lean, taillight, [0, 0.83, -1.367], [0.3, 0.09, 0.025])
   brakeLens.name = 'brake-light'
@@ -248,6 +285,9 @@ export function buildRiderVehicle() {
 
   const articulatedMeshes = new Set<Mesh>([
     brakeLens,
+    headlightLens,
+    headlightBeam,
+    headlightPool,
     supportThigh,
     supportKnee,
     supportShin,
@@ -277,12 +317,21 @@ export function buildRiderVehicle() {
 
   return {
     root,
-    update({ wheelAngle, steeringAngle, leanAngle, braking, standLeg = 0 }: RiderVisualState) {
+    update({ wheelAngle, steeringAngle, leanAngle, braking, standLeg = 0, headlightIntensity = 0 }: RiderVisualState) {
       const visualSteer = Math.max(-0.56, Math.min(0.56, steeringAngle))
       frontWheel.rotation.x = wheelAngle
       rearWheel.rotation.x = wheelAngle
       steering.rotation.y = visualSteer
       lean.rotation.z = leanAngle
+      const beamStrength = Math.max(0, Math.min(1, headlightIntensity))
+      headlight.emissiveIntensity = 0.7 + beamStrength * 2.4
+      const beamOn = beamStrength > 0.03
+      headlightBeam.visible = beamOn
+      headlightPool.visible = beamOn
+      if (beamOn) {
+        beamMaterial.opacity = beamStrength * 0.22
+        roadPoolMaterial.opacity = beamStrength * 0.28
+      }
       taillight.color.set(braking ? '#ff5548' : '#ac3435')
       taillight.emissiveIntensity = braking ? 2.8 : 0.18
       for (const arm of forearms) {
