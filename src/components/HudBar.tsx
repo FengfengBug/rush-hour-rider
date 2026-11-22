@@ -199,7 +199,7 @@ export function HudBar({
             className="hud-action-btn"
             type="button"
             aria-pressed={muted}
-            title={muted ? '已静音（点击开启；Task 3.4 将接入合成音效）' : '音效已开启（点击静音；Task 3.4 将接入合成音效）'}
+            title={muted ? '已静音（点击开启程序化音效）' : '音效已开启（点击一键静音）'}
             aria-label={muted ? '取消静音' : '静音'}
             onClick={(event) => {
               onToggleMute()

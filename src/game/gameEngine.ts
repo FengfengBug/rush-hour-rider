@@ -26,6 +26,7 @@ import { OrderManager } from './orderManager'
 import { EventSystem, type EventResolution } from './eventSystem'
 import { InteriorScene } from './interiorScene'
 import { WeatherSystem } from './weatherSystem'
+import { AudioEngine } from './audioEngine'
 import type { CityLandmark, CityView, Direction, EngineSnapshot, InteriorTheme, NavigationFrameListener, OrderReportReason, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
@@ -66,6 +67,7 @@ export class GameEngine {
   private readonly traffic = new TrafficSystem(CITY_LAYOUT, (event) => {
     if (event.type === 'red-light') {
       const { fineCents, messageText } = this.eventSystem.handleRedLightViolation()
+      this.audio.playViolation()
       if (fineCents > 0) {
         this.orders.recordOperatingExpense(fineCents, 'payment', messageText, '交警提示')
       } else {
@@ -80,6 +82,10 @@ export class GameEngine {
   private readonly eventSystem = new EventSystem()
   private readonly interior = new InteriorScene()
   private readonly weather = new WeatherSystem()
+  private readonly audio = new AudioEngine()
+  private lastKnownOfferCount = 0
+  private lastKnownCompletedCount = 0
+  private lastKnownPickedUpCount = 0
   private readonly enterableLandmarks: readonly { landmark: CityLandmark; theme: InteriorTheme }[]
   private readonly navigationVisuals: ReturnType<typeof buildNavigationVisuals>
   private navigationFrameListener: NavigationFrameListener | null = null
@@ -176,6 +182,7 @@ export class GameEngine {
     this.resizeObserver = new ResizeObserver(this.resize)
     this.resizeObserver.observe(this.container)
     window.addEventListener('resize', this.resize)
+    window.addEventListener('pointerdown', this.unlockAudio, { passive: true })
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
     window.addEventListener('blur', this.clearInput)
@@ -260,6 +267,7 @@ export class GameEngine {
   setMuted(muted: boolean) {
     if (this.muted === muted) return
     this.muted = muted
+    this.audio.setMuted(muted)
     this.lastSnapshotTime = 0
   }
 
@@ -381,6 +389,9 @@ export class GameEngine {
     const landmarkName = this.interior.landmarkName ?? '建筑大堂'
     const orderId = this.interior.orderId
     if (!this.orders.completeInteriorPhotoDelivery(orderId, landmarkName)) return false
+    this.audio.playCameraShutter()
+    this.audio.playDelivery()
+    this.lastKnownCompletedCount = this.orders.getSnapshot(this.controller.state, false).completed.length
     this.interior.triggerShutter(`${orderId} 拍照存证成功 · 已确认送达！`)
     this.syncOrderNavigation()
     this.lastSnapshotTime = 0
@@ -445,6 +456,7 @@ export class GameEngine {
         '换电柜',
       )
       this.eventSystem.recordBatterySwap(station.name)
+      this.audio.playBatterySwapComplete()
       this.batterySwapStationId = null
       this.batterySwapElapsed = 0
       this.lastSnapshotTime = 0
@@ -483,6 +495,12 @@ export class GameEngine {
     }
     if (resolution.staminaCost > 0) this.controller.consumeStamina(resolution.staminaCost)
     this.orders.applyEventResolution(resolution)
+    if (resolution.action === 'complete-pickup') this.audio.playPickup()
+    else if (resolution.action === 'complete-delivery') this.audio.playDelivery()
+    const os = this.orders.getSnapshot(this.controller.state, false)
+    this.lastKnownOfferCount = os.offers.length
+    this.lastKnownCompletedCount = os.completed.length
+    this.lastKnownPickedUpCount = os.active.filter((o) => o.status === 'delivery').length
     this.syncOrderNavigation()
     this.lastSnapshotTime = 0
     this.focusCanvas()
@@ -528,6 +546,9 @@ export class GameEngine {
     this.distractionWarningCount = 0
     this.batterySwapStationId = null
     this.batterySwapElapsed = 0
+    this.lastKnownOfferCount = this.orders.getSnapshot(this.controller.state, false).offers.length
+    this.lastKnownCompletedCount = 0
+    this.lastKnownPickedUpCount = 0
     this.setCityView('ride')
     this.lastSnapshotTime = 0
   }
@@ -557,6 +578,7 @@ export class GameEngine {
     }
     this.resizeObserver.disconnect()
     window.removeEventListener('resize', this.resize)
+    window.removeEventListener('pointerdown', this.unlockAudio)
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
     window.removeEventListener('blur', this.clearInput)
@@ -574,6 +596,7 @@ export class GameEngine {
     this.rider.dispose()
     this.interior.dispose()
     this.weather.dispose()
+    this.audio.dispose()
     this.world.dispose()
     this.sunlight.shadow.dispose()
     this.scene.clear()
@@ -582,7 +605,14 @@ export class GameEngine {
     this.renderer.domElement.remove()
   }
 
-  readonly focusCanvas = () => this.renderer.domElement.focus({ preventScroll: true })
+  readonly focusCanvas = () => {
+    this.audio.unlock()
+    this.renderer.domElement.focus({ preventScroll: true })
+  }
+
+  private readonly unlockAudio = () => {
+    this.audio.unlock()
+  }
 
   private readonly onCanvasPointerMove = (event: PointerEvent) => {
     if (this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
@@ -621,6 +651,7 @@ export class GameEngine {
   }
 
   private readonly onKeyDown = (event: KeyboardEvent) => {
+    this.audio.unlock()
     if (event.ctrlKey || event.metaKey || event.altKey) return
     if (this.eventSystem.hasActiveEvent) return
     if (this.interior.mode === 'photo') {
@@ -676,6 +707,7 @@ export class GameEngine {
       if (!event.repeat && this.hornRemaining <= 0) {
         this.hornRemaining = 0.7
         this.trafficVisuals.honk(this.controller.state, this.controller.state.heading)
+        this.audio.playHorn()
       }
     } else if (this.view === 'ride' && !this.shiftEnded && DRIVING_KEYS.has(event.code)) {
       if (!event.code.startsWith('Shift')) event.preventDefault()
@@ -797,7 +829,12 @@ export class GameEngine {
       })
       const state = this.controller.state
       const impact = this.traffic.checkCollision(state, this.distractionLevel)
-      if (impact) this.controller.applyTrafficImpact(impact.normalX, impact.normalZ, impact.distance, this.distractionLevel)
+      if (impact) {
+        this.controller.applyTrafficImpact(impact.normalX, impact.normalZ, impact.distance, this.distractionLevel)
+        this.audio.playCollision()
+      } else if (state.colliding) {
+        this.audio.playCollision()
+      }
       this.traffic.checkSignals(previousPosition, state)
       const waitingAtRed = this.traffic.isWaitingAtRedLight(state)
       this.eventSystem.setLiveTelemetry({
@@ -825,6 +862,7 @@ export class GameEngine {
             this.clearInput()
             this.distractionActive = false
             this.distractionLevel = 0
+            this.audio.playModalAlert()
             this.lastSnapshotTime = 0
           }
           return triggered
@@ -837,6 +875,7 @@ export class GameEngine {
             this.clearInput()
             this.distractionActive = false
             this.distractionLevel = 0
+            this.audio.playModalAlert()
             this.lastSnapshotTime = 0
           }
         }
@@ -851,11 +890,28 @@ export class GameEngine {
               this.orders.getLandmarkName(urgentOrder.deliveryId),
               urgentOrder.ledger.merchantDelaySec > 0,
             )
-            if (triggeredCall) this.lastSnapshotTime = 0
+            if (triggeredCall) {
+              this.audio.playIncomingCall()
+              this.lastSnapshotTime = 0
+            }
           }
         }
       }
-      if (orderRevision !== this.orders.revision) this.syncOrderNavigation()
+      if (orderRevision !== this.orders.revision) {
+        const os = this.orders.getSnapshot(state, false)
+        const pickedUpCount = os.active.filter((o) => o.status === 'delivery').length
+        if (os.completed.length > this.lastKnownCompletedCount) {
+          this.audio.playDelivery()
+        } else if (pickedUpCount > this.lastKnownPickedUpCount) {
+          this.audio.playPickup()
+        } else if (os.offers.length > this.lastKnownOfferCount) {
+          this.audio.playNewOrder()
+        }
+        this.lastKnownOfferCount = os.offers.length
+        this.lastKnownCompletedCount = os.completed.length
+        this.lastKnownPickedUpCount = pickedUpCount
+        this.syncOrderNavigation()
+      }
       this.navigationElapsed += stepSeconds
       if (this.navigationElapsed >= 0.1) {
         this.navigation.update(state)
@@ -914,6 +970,13 @@ export class GameEngine {
       this.view === 'ride',
     )
     this.orders.setRaining(this.weather.isRaining)
+    this.audio.updateContinuous({
+      speedAbs: Math.abs(this.controller.state.speed),
+      boosting: this.controller.state.boosting,
+      rainIntensity: this.weather.intensity,
+      active: shiftActive && !eventBlocking,
+      indoor: insideBuilding,
+    })
     if (this.interior.mode !== 'none') {
       this.renderer.render(this.interior.scene, this.interior.camera)
     } else {
