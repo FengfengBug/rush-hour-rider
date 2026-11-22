@@ -78,7 +78,7 @@ function buildEventCard(
         ],
         sprint: null,
       }
-    case 'old-estate-no-ebike':
+    case 'luxury-compound-no-ebike':
       return {
         instanceId,
         kind,
@@ -86,23 +86,23 @@ function buildEventCard(
         orderId,
         landmarkId: landmark.id,
         landmarkName: name,
-        badge: `小区门禁 · ${name}`,
-        title: '老旧小区禁入电驴',
-        description: `${name}保安拦下电动车，里面楼栋深只能步行冲刺或绕后门。`,
+        badge: `高端物业门禁 · ${name}`,
+        title: '高端小区禁入电驴',
+        description: `${name}物业实行人车分流严禁电驴入内，门口保安拦车只能锁车步行或绕侧门。`,
         options: [
           {
             id: 'a',
             keyHint: '1',
             label: '锁车步行冲刺',
-            summary: '3 秒内连续快按 Space 奔跑送达，省时费力',
+            summary: '3 秒内连续快按 Space 奔跑进小区送达，省时费力',
             tags: ['连按 Space 冲刺', '预计 +8~14 秒', '体力 -14%'],
             tone: 'action',
           },
           {
             id: 'b',
             keyHint: '2',
-            label: '绕道后门推进',
-            summary: '从后门小路绕行送达，省体力但耗时更长',
+            label: '绕道物业侧门',
+            summary: '按物业规定绕走货梯/侧门送达，省体力但耗时更长',
             tags: ['固定 +17 秒', '体力 -3%'],
             tone: 'safe',
           },
@@ -305,7 +305,7 @@ export class EventSystem {
     if (!current || current.sprint?.active) return null
     const { kind, orderId, phase, landmarkName } = current.view
 
-    if (kind === 'old-estate-no-ebike' && choiceIndex === 0) {
+    if (kind === 'luxury-compound-no-ebike' && choiceIndex === 0) {
       const exhausted = current.riderStaminaAtStart < 15
       current.sprint = {
         active: true,
@@ -355,7 +355,7 @@ export class EventSystem {
       })
     }
 
-    if (kind === 'old-estate-no-ebike') {
+    if (kind === 'luxury-compound-no-ebike') {
       return this.commitResolution({
         orderId,
         phase,
@@ -366,8 +366,8 @@ export class EventSystem {
         tipCents: 0,
         eventPenaltyCents: 0,
         messageKind: 'system',
-        messageText: `${landmarkName}禁入电驴，绕道后门耗时 17 秒送达。`,
-        outcomeTitle: '绕道后门送达',
+        messageText: `${landmarkName}高端物业禁入电驴，绕道物业侧门耗时 17 秒送达。`,
+        outcomeTitle: '绕道侧门送达',
         outcomeSummary: '末端绕行 +17 秒 · 体力 -3%',
         tone: 'neutral',
       })
@@ -613,14 +613,20 @@ export class EventSystem {
   private getCandidates(phase: 'pickup' | 'delivery', buildingKind: BuildingKind): GameEventKind[] {
     if (phase === 'pickup') return ['merchant-backlog']
     switch (buildingKind) {
+      case 'luxury':
+        // 贴合国内现实：高端封闭式物业小区常严禁外卖电驴入内
+        return ['luxury-compound-no-ebike', 'wrong-pin-address']
       case 'apartment':
-        return ['old-estate-no-ebike', 'wrong-pin-address']
+        // 老旧开放小区大多可直接骑车进楼下，不再触发禁入电驴
+        return ['wrong-pin-address']
       case 'office':
+      case 'tech':
         return ['cbd-elevator-jam', 'locker-full', 'wrong-pin-address']
       case 'hospital':
         return ['locker-full', 'wrong-pin-address']
       case 'school':
-        return ['wrong-pin-address', 'locker-full']
+      case 'campus':
+        return ['locker-full', 'wrong-pin-address']
       default:
         return ['wrong-pin-address']
     }

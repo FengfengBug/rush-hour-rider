@@ -72,10 +72,19 @@ export class OrderManager {
     this.incomeCents = 0
     this.notice = '开工了，选择一单开始配送。'
     const nearby = [...this.merchants].sort((a, b) => distance(a.access.position, this.spawn) - distance(b.access.position, this.spawn))
-    for (const merchant of nearby.slice(0, 3)) {
-      const destination = [...this.destinations].sort((a, b) => distance(a.access.position, merchant.access.position) - distance(b.access.position, merchant.access.position))[0]
+    const usedDestinations = new Set<string>()
+    // 开局三单涵盖不同特征送达区（含高端封闭小区御景华府），方便快速体验多元街区与门禁差异。
+    const preferredDeliveries = ['xingfuli-estate', 'yujing-manor', 'starlight-tower']
+    nearby.slice(0, 3).forEach((merchant, index) => {
+      const preferredId = preferredDeliveries[index]
+      const preferred = preferredId ? this.destinations.find((entry) => entry.id === preferredId && !usedDestinations.has(entry.id)) : undefined
+      const destination = preferred ?? [...this.destinations]
+        .filter((entry) => !usedDestinations.has(entry.id))
+        .sort((a, b) => distance(a.access.position, merchant.access.position) - distance(b.access.position, merchant.access.position))[0]
+        ?? this.destinations[0]
+      usedDestinations.add(destination.id)
       this.createOffer(merchant, destination, this.spawn, 0)
-    }
+    })
     this.nextOfferAt = this.interval()
     this.revision += 1
   }
@@ -305,7 +314,7 @@ export class OrderManager {
         const merchant = this.landmarks.get(offer.merchantId)!.access.position
         const delivery = this.landmarks.get(offer.deliveryId)!.access.position
         const extraDistance = target ? distance(rider, merchant) + distance(merchant, delivery) + distance(delivery, target) - distance(rider, target) : Infinity
-        return { ...offer, ...this.estimate(offer.merchantId, offer.deliveryId, rider), onTheWay: extraDistance <= 25 }
+        return { ...offer, ...this.estimate(offer.merchantId, offer.deliveryId, rider), onTheWay: extraDistance <= 35 }
       }),
       active: this.active.map(copy), completed: this.completed.map(copy),
       priorityId: this.priorityId, incomeCents: this.incomeCents, paused, notice: this.notice,
@@ -344,9 +353,15 @@ export class OrderManager {
 
   private refreshOffer(rider: Point2, at: number): void {
     if (this.offers.length >= 3) this.offers.shift()
-    const candidates = this.merchants.flatMap((merchant) => this.destinations.map((destination) => ({ merchant, destination })))
+    const allCandidates = this.merchants.flatMap((merchant) => this.destinations.map((destination) => ({ merchant, destination })))
       .filter(({ merchant, destination }) => ![...this.offers, ...this.active].some((order) => order.merchantId === merchant.id && order.deliveryId === destination.id))
-    const pair = candidates[Math.floor(this.random() * candidates.length)]
+    // 8×8 扩容大城下优先派送合理半径内的近中程单，避免跨 720m 全图导致无解超时。
+    const localCandidates = allCandidates.filter(({ merchant, destination }) => (
+      distance(rider, merchant.access.position) <= 270
+      && distance(merchant.access.position, destination.access.position) <= 340
+    ))
+    const pool = localCandidates.length > 0 ? localCandidates : allCandidates
+    const pair = pool[Math.floor(this.random() * pool.length)]
     this.createOffer(pair.merchant, pair.destination, rider, at)
   }
 }

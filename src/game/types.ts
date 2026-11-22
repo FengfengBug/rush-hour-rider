@@ -12,8 +12,26 @@ export interface Aabb2 {
 
 export type Direction = 'north' | 'east' | 'south' | 'west'
 export type RoadAxis = 'x' | 'z'
-export type DistrictId = 'food-street' | 'old-neighborhood' | 'cbd' | 'civic-center'
-export type BuildingKind = 'shop' | 'apartment' | 'office' | 'civic' | 'hospital' | 'school'
+export type DistrictId =
+  | 'food-street'
+  | 'night-market'
+  | 'old-neighborhood'
+  | 'luxury-compound'
+  | 'cbd'
+  | 'tech-park'
+  | 'civic-center'
+  | 'university-town'
+export type BuildingKind =
+  | 'shop'
+  | 'mall'
+  | 'apartment'
+  | 'luxury'
+  | 'office'
+  | 'tech'
+  | 'civic'
+  | 'hospital'
+  | 'school'
+  | 'campus'
 export type CityView = 'ride' | 'rider-rear' | 'rider-side' | 'overview' | DistrictId
 export type RiderPreviewMode = 'parked' | 'motion' | 'braking'
 export type RideCameraMode = 'near' | 'far' | 'overhead'
@@ -304,7 +322,7 @@ export interface DistractionSnapshot {
 
 export type GameEventKind =
   | 'merchant-backlog'
-  | 'old-estate-no-ebike'
+  | 'luxury-compound-no-ebike'
   | 'cbd-elevator-jam'
   | 'wrong-pin-address'
   | 'locker-full'

@@ -24,7 +24,7 @@ function EventIcon({ kind }: { kind: GameEventKind }) {
   switch (kind) {
     case 'merchant-backlog':
       return <Store size={16} aria-hidden="true" />
-    case 'old-estate-no-ebike':
+    case 'luxury-compound-no-ebike':
       return <Footprints size={16} aria-hidden="true" />
     case 'cbd-elevator-jam':
       return <Building2 size={16} aria-hidden="true" />

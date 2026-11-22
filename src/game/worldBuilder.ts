@@ -30,20 +30,28 @@ const BUILDING_BASE = 0.16
 const FACING: Record<Direction, number> = { south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 }
 const PALETTES: Record<BuildingKind, readonly string[]> = {
   shop: ['#e5cba7', '#f1dbb8', '#e5b98e', '#d9c3a1'],
+  mall: ['#ecd1b4', '#e8be96', '#f2dcb8', '#dfb894'],
   apartment: ['#ba7966', '#cd8d72', '#ae7161', '#d5a185'],
+  luxury: ['#efe7d6', '#e6dcc7', '#e2d7c2', '#f3ecdd'],
   office: ['#77a6b4', '#6193a4', '#a2c6cd', '#8bb2bd'],
+  tech: ['#d9e4e8', '#c8d9e2', '#e4ecf0', '#b8cdd9'],
   civic: ['#d6dfcc', '#eadfbb', '#c5d9ca', '#e5d3ac'],
   hospital: ['#ece6d9'],
   school: ['#eed49c'],
+  campus: ['#cfa58a', '#d8b796', '#c6997e', '#dec5a2'],
 }
 const SHOP_COLORS = ['#a64032', '#cd6c30', '#307b70', '#8b3840', '#346863', '#315c83', '#b16b25']
 const GENERIC_SIGNS: Record<BuildingKind, readonly string[]> = {
   shop: ['巷口早点', '街坊便利', '鲜果铺', '家常小炒'],
+  mall: ['星光百货', '夜市食汇', '潮流生活馆', '万象市集'],
   apartment: ['红砖公寓', '邻里人家'],
+  luxury: ['翡翠名邸', '御景名筑', '铂金华庭'],
   office: ['星辰商务', '创客空间'],
+  tech: ['智谷科创', '云端实验室', '未来工坊'],
   civic: ['社区服务', '邻里书屋', '便民中心'],
   hospital: ['社区门诊'],
   school: ['育才学园'],
+  campus: ['博雅教学楼', '南城图书馆', '学园公寓'],
 }
 
 export function buildWorld(layout: CityLayout) {
@@ -93,9 +101,9 @@ export function buildWorld(layout: CityLayout) {
   const furniture = batch('street-furniture')
   const signs: Sign[] = []
 
-  put(foundations, 0, -5, 0, 2200, 1, 2200, '#bed0b1')
-  put(foundations, 0, -2, 0, layout.size + 12, 3.6, layout.size + 12, '#d4c6a9')
-  put(foundations, 0, -3.65, 0, layout.size + 16, 0.4, layout.size + 16, '#b4b9a0')
+  put(foundations, 0, -5, 0, 3600, 1, 3600, '#bed0b1')
+  put(foundations, 0, -2, 0, layout.size + 14, 3.6, layout.size + 14, '#d4c6a9')
+  put(foundations, 0, -3.65, 0, layout.size + 18, 0.4, layout.size + 18, '#b4b9a0')
 
   function roadBox(minX: number, maxX: number, minZ: number, maxZ: number) {
     put(foundations, (minX + maxX) / 2, -0.045, (minZ + maxZ) / 2, maxX - minX, 0.09, maxZ - minZ, '#697b79')
@@ -191,14 +199,30 @@ export function buildWorld(layout: CityLayout) {
     const landmark = layout.landmarks.find((point) => point.buildingId === building.id)
     const front = landmark?.access.side ?? (index % 4 < 2 ? 'north' : 'south')
     const accent = kind === 'shop' ? SHOP_COLORS[index % SHOP_COLORS.length]
-      : kind === 'apartment' ? '#8b5146' : kind === 'hospital' ? '#a34840'
-        : kind === 'school' ? '#397e72' : '#3d6e79'
+      : kind === 'mall' ? '#c95c34'
+        : kind === 'apartment' ? '#8b5146'
+          : kind === 'luxury' ? '#7b5f31'
+            : kind === 'tech' ? '#365e7d'
+              : kind === 'hospital' ? '#a34840'
+                : kind === 'school' ? '#397e72'
+                  : kind === 'campus' ? '#4f7354'
+                    : '#3d6e79'
+    const plinthColor = kind === 'shop' ? accent
+      : kind === 'luxury' ? '#584c3e'
+        : kind === 'mall' ? '#9e4d32'
+          : kind === 'tech' ? '#526f82'
+            : '#b8bcae'
+    const roofColor = kind === 'apartment' ? '#825e52'
+      : kind === 'luxury' ? '#c7a257'
+        : kind === 'campus' ? '#4d7354'
+          : kind === 'tech' ? '#7798ab'
+            : '#f0e5c9'
     const plinthHeight = 0.7
     const upperHeight = Math.max(0.5, h - plinthHeight)
     // 底座与主体墙面垂直堆叠且零重叠，彻底消除建筑底部共面 Z-Fighting 条纹屏闪。
-    put(details, x, BUILDING_BASE + plinthHeight / 2, z, width, plinthHeight, depth, kind === 'shop' ? accent : '#b8bcae')
+    put(details, x, BUILDING_BASE + plinthHeight / 2, z, width, plinthHeight, depth, plinthColor)
     put(shells, x, BUILDING_BASE + plinthHeight + upperHeight / 2, z, width, upperHeight, depth, palette[index % palette.length])
-    put(details, x, BUILDING_BASE + h + 0.24, z, width, 0.48, depth, kind === 'apartment' ? '#825e52' : '#f0e5c9')
+    put(details, x, BUILDING_BASE + h + 0.24, z, width, 0.48, depth, roofColor)
 
     if (kind === 'office') {
       put(details, x, BUILDING_BASE + h + 1.1, z, width * 0.68, 1.7, depth * 0.62, '#5b808d')
@@ -207,6 +231,24 @@ export function buildWorld(layout: CityLayout) {
           put(details, x + dx, BUILDING_BASE + plinthHeight + upperHeight / 2, z + dz, 0.7, upperHeight, 0.7, '#d5e4df')
         }
       }
+    } else if (kind === 'luxury') {
+      // 高端封闭小区标志性金顶屋檐与正门物业门禁门楼
+      put(details, x, BUILDING_BASE + h + 1.0, z, width * 0.72, 1.25, depth * 0.72, '#dfd3b8')
+      put(details, x, BUILDING_BASE + h + 1.78, z, width * 0.76, 0.32, depth * 0.76, '#c8a052')
+      const gateCanopy = facade(building, front, 0, 3.05, 1.05)
+      put(details, gateCanopy.x, gateCanopy.y, gateCanopy.z, 7.2, 0.32, 2.0, '#c8a052', gateCanopy.yaw)
+      for (const sideOffset of [-3.1, 3.1]) {
+        const pillar = facade(building, front, sideOffset, 1.5, 1.85)
+        put(details, pillar.x, pillar.y, pillar.z, 0.42, 3.0, 0.42, '#584c3e', pillar.yaw)
+      }
+    } else if (kind === 'tech') {
+      // 科技园区屋顶光伏板阵列
+      put(details, x, BUILDING_BASE + h + 0.85, z, width * 0.76, 0.7, depth * 0.68, '#38576e')
+      put(details, x, BUILDING_BASE + h + 1.32, z, width * 0.66, 0.16, depth * 0.54, '#24455d')
+    } else if (kind === 'mall') {
+      put(details, x, BUILDING_BASE + h + 1.15, z, width * 0.82, 1.4, depth * 0.76, '#d97a46')
+    } else if (kind === 'campus') {
+      put(details, x, BUILDING_BASE + h + 0.9, z, width * 0.78, 0.9, depth * 0.72, '#587d5d')
     } else if (kind === 'apartment') {
       put(details, x, BUILDING_BASE + h + 0.85, z, width * 0.66, 1.2, depth * 0.57, '#b9957b')
       put(trunks, x + 6, BUILDING_BASE + h + 1.65, z - 4, 1.55, 2.3, 1.55, '#a8b6ac')
@@ -216,17 +258,21 @@ export function buildWorld(layout: CityLayout) {
 
     for (const side of ['north', 'east', 'south', 'west'] as const) {
       const faceWidth = side === 'north' || side === 'south' ? width : depth
-      const columns = Math.floor(faceWidth / (kind === 'office' ? 4.8 : 5.8))
-      const floors = kind === 'shop' ? 1 : Math.floor(h / 3.4)
+      const columns = Math.floor(faceWidth / (kind === 'office' || kind === 'tech' ? 4.8 : 5.8))
+      const floors = kind === 'shop' ? 1 : kind === 'mall' ? 2 : Math.floor(h / 3.5)
       for (let floor = 0; floor < floors; floor += 1) {
         for (let column = 0; column < columns; column += 1) {
           const along = (column + 0.5) * faceWidth / columns - faceWidth / 2
           const p = facade(building, side, along, 1.65 + floor * 3.4)
-          const windowWidth = faceWidth / columns - (kind === 'office' ? 0.65 : 2.2)
-          const windowHeight = kind === 'shop' ? 2.1 : kind === 'office' ? 2.55 : 1.85
-          const tint = (floor + column + index) % 5 === 0 ? '#bdd9cc' : kind === 'apartment' ? '#4b777a' : '#467c8c'
+          const windowWidth = faceWidth / columns - (kind === 'office' || kind === 'tech' ? 0.65 : kind === 'luxury' ? 1.5 : 2.2)
+          const windowHeight = kind === 'shop' ? 2.1 : kind === 'office' || kind === 'tech' ? 2.5 : kind === 'luxury' ? 2.15 : 1.85
+          const tint = (floor + column + index) % 5 === 0 ? '#bdd9cc'
+            : kind === 'luxury' ? '#58787f'
+              : kind === 'apartment' ? '#4b777a'
+                : '#467c8c'
           put(windows, p.x, p.y, p.z, windowWidth, windowHeight, 1, tint, p.yaw)
           if (kind === 'apartment') put(details, p.x, p.y - 1.05, p.z, windowWidth + 0.35, 0.2, 0.48, '#e5cfb0', p.yaw)
+          if (kind === 'luxury') put(details, p.x, p.y - 1.16, p.z, windowWidth + 0.4, 0.16, 0.45, '#c8a052', p.yaw)
         }
       }
     }
@@ -240,7 +286,7 @@ export function buildWorld(layout: CityLayout) {
     const title = landmark?.name ?? GENERIC_SIGNS[kind][index % GENERIC_SIGNS[kind].length]
     sign(title, accent, p.x, p.y, p.z, faceWidth * 0.84, signHeight, p.yaw)
 
-    if (kind === 'shop') {
+    if (kind === 'shop' || kind === 'mall') {
       for (let stripe = 0; stripe < 8; stripe += 1) {
         const along = (stripe + 0.5) * faceWidth / 8 - faceWidth / 2
         const awning = facade(building, front, along, 2.75, 0.7)
@@ -277,12 +323,12 @@ export function buildWorld(layout: CityLayout) {
     const end = alongX ? b.maxX : b.maxZ
     const fixed = alongX ? (b.minZ + b.maxZ) / 2 : (b.minX + b.maxX) / 2
     const road = roadById.get(sidewalk.roadId)!
-    for (let along = start + 12; along < end - 7; along += 24) {
+    for (let along = start + 14; along < end - 8; along += 34) {
       const x = alongX ? along : fixed
       const z = alongX ? fixed : along
       if (clearEntrance(x, z)) tree(x, z, index)
     }
-    for (let along = start + 24; along < end - 8; along += 36) {
+    for (let along = start + 26; along < end - 9; along += 44) {
       const x = alongX ? along : fixed
       const z = alongX ? fixed : along
       if (!clearEntrance(x, z)) continue
@@ -344,12 +390,13 @@ export function buildWorld(layout: CityLayout) {
   const canvas = document.createElement('canvas')
   const tileWidth = 512
   const tileHeight = 128
-  canvas.width = tileWidth * 2
-  canvas.height = 2 ** Math.ceil(Math.log2(Math.ceil(tiles.length / 2) * tileHeight))
+  const atlasColumns = 4
+  canvas.width = tileWidth * atlasColumns
+  canvas.height = 2 ** Math.ceil(Math.log2(Math.max(1, Math.ceil(tiles.length / atlasColumns)) * tileHeight))
   const context = canvas.getContext('2d')!
   tiles.forEach((entry, index) => {
-    const x = index % 2 * tileWidth
-    const y = Math.floor(index / 2) * tileHeight
+    const x = (index % atlasColumns) * tileWidth
+    const y = Math.floor(index / atlasColumns) * tileHeight
     context.fillStyle = entry.color
     context.fillRect(x, y, tileWidth, tileHeight)
     context.strokeStyle = '#f2d99d'
@@ -370,8 +417,8 @@ export function buildWorld(layout: CityLayout) {
   const signMaterial = new MeshBasicMaterial({ map: atlas, toneMapped: false })
   const signGeometries = signs.map((entry) => {
     const index = tiles.findIndex((tile) => tile.text === entry.text && tile.color === entry.color)
-    const u = index % 2 * tileWidth
-    const v = Math.floor(index / 2) * tileHeight
+    const u = (index % atlasColumns) * tileWidth
+    const v = Math.floor(index / atlasColumns) * tileHeight
     const geometry = new PlaneGeometry(1, 1)
     const uv = geometry.getAttribute('uv')
     for (let vertex = 0; vertex < uv.count; vertex += 1) {

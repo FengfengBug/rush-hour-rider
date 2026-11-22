@@ -28,9 +28,13 @@ import type { CityView, Direction, EngineSnapshot, NavigationFrameListener, Orde
 
 const DISTRICT_FOCUS = {
   'food-street': 'shaxian-snacks',
+  'night-market': 'starlight-mall-food',
   'old-neighborhood': 'sunshine-estate',
+  'luxury-compound': 'yujing-manor',
   cbd: 'starlight-tower',
+  'tech-park': 'zhigu-rd-park',
   'civic-center': 'south-community-hospital',
+  'university-town': 'nancheng-university',
 } as const
 const VIEW_ANGLE: Record<Direction, number> = { south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 }
 export const SHIFT_DURATION_SECONDS = 210
@@ -53,7 +57,7 @@ export class GameEngine {
   private readonly container: HTMLElement
   private readonly onSnapshot: (snapshot: EngineSnapshot) => void
   private readonly scene = new Scene()
-  private readonly previewCamera = new OrthographicCamera(-300, 300, 300, -300, 0.1, 2400)
+  private readonly previewCamera = new OrthographicCamera(-560, 560, 560, -560, 0.1, 3400)
   private readonly followCamera = new FollowCamera(CITY_LAYOUT.buildings)
   private readonly controller = new RiderController(CITY_LAYOUT)
   private readonly dust = buildBrakeDust()
@@ -113,12 +117,12 @@ export class GameEngine {
     this.container.append(this.renderer.domElement)
 
     this.scene.background = new Color('#dce7d5')
-    this.scene.fog = new Fog('#dce7d5', 850, 1500)
+    this.scene.fog = new Fog('#dce7d5', 950, 2000)
     this.scene.add(new HemisphereLight('#fff7e6', '#859a80', 1.8))
     this.sunlight.castShadow = true
     this.sunlight.shadow.mapSize.set(2048, 2048)
     this.sunlight.shadow.camera.near = 30
-    this.sunlight.shadow.camera.far = 950
+    this.sunlight.shadow.camera.far = 1500
     this.sunlight.shadow.autoUpdate = false
     this.scene.add(this.sunlight, this.sunlight.target)
     this.world = buildWorld(CITY_LAYOUT)
@@ -165,9 +169,9 @@ export class GameEngine {
     const riderView = view === 'rider-rear' || view === 'rider-side'
     this.navigationVisuals.root.visible = !riderView
     this.navigationVisuals.update(0, this.controller.state, this.navigation.snapshot, view === 'ride')
-    const shadowExtent = view === 'ride' ? 40 : riderView ? 7 : 290
+    const shadowExtent = view === 'ride' ? 44 : riderView ? 7 : 560
     this.sunlight.target.position.copy(view === 'ride' || riderView ? this.rider.root.position : this.scene.position)
-    this.sunlight.position.copy(this.sunlight.target.position).add({ x: -240, y: 410, z: 220 })
+    this.sunlight.position.copy(this.sunlight.target.position).add(view === 'ride' || riderView ? { x: -240, y: 410, z: 220 } : { x: -420, y: 680, z: 380 })
     this.sunlight.shadow.camera.left = -shadowExtent
     this.sunlight.shadow.camera.right = shadowExtent
     this.sunlight.shadow.camera.top = shadowExtent
@@ -192,10 +196,10 @@ export class GameEngine {
       const back = view === 'rider-rear' ? -6 : 1
       this.controls.target.set(x, y + 1.1, z)
       this.previewCamera.position.set(x + Math.cos(angle) * side + Math.sin(angle) * back, y + 4.2, z - Math.sin(angle) * side + Math.cos(angle) * back)
-      this.previewCamera.zoom = 110
+      this.previewCamera.zoom = 205
     } else if (view === 'overview') {
       this.controls.target.set(0, 0, 0)
-      this.previewCamera.position.set(340, 330, 420)
+      this.previewCamera.position.set(580, 560, 720)
       this.previewCamera.zoom = 1
     } else {
       const landmark = CITY_LAYOUT.landmarks.find((entry) => entry.id === DISTRICT_FOCUS[view])!
@@ -204,8 +208,8 @@ export class GameEngine {
       const z = (building.bounds.minZ + building.bounds.maxZ) / 2
       const angle = VIEW_ANGLE[landmark.access.side]
       this.controls.target.set(x, 4, z)
-      this.previewCamera.position.set(x + Math.sin(angle) * 160 + Math.cos(angle) * 110, 134, z + Math.cos(angle) * 160 - Math.sin(angle) * 110)
-      this.previewCamera.zoom = 5.8
+      this.previewCamera.position.set(x + Math.sin(angle) * 190 + Math.cos(angle) * 130, 156, z + Math.cos(angle) * 190 - Math.sin(angle) * 130)
+      this.previewCamera.zoom = 9.2
     }
     this.previewCamera.updateProjectionMatrix()
     this.controls.update()
@@ -457,7 +461,7 @@ export class GameEngine {
     this.renderer.setSize(this.viewportWidth, this.viewportHeight, false)
     this.followCamera.resize(this.viewportWidth, this.viewportHeight)
     const aspect = this.viewportWidth / this.viewportHeight
-    const halfHeight = 295 / Math.min(aspect, 1)
+    const halfHeight = 565 / Math.min(aspect, 1)
     const halfWidth = halfHeight * aspect
     this.previewCamera.left = -halfWidth
     this.previewCamera.right = halfWidth

@@ -90,6 +90,7 @@
 .ride-camera, .reset-rider { min-height: 30px; padding: 5px 6px; white-space: nowrap; }
 .scene-overlay .reset-rider { flex: none; background: #f2ebd8; }
 .scene-overlay .return-ride { min-height: 24px; padding: 3px 8px; border-color: #d5b45c; background: #f6d774; font-size: 10px; font-weight: 650; white-space: nowrap; }
+.scene-overlay .map-mode-toggle { min-height: 22px; padding: 2px 7px; border-color: #cfd5c3; background: #f2f1e6; color: #475743; font-size: 10px; font-weight: 650; white-space: nowrap; }
 .scene-overlay button:hover:not(:disabled) { border-color: #ae8a39; background: #f6ebcd; }
 .scene-overlay button[aria-pressed="true"] { border-color: #b19349; color: #745518; background: #f7e6af; font-weight: 650; }
 .scene-overlay button:disabled { opacity: 0.5; cursor: not-allowed; }

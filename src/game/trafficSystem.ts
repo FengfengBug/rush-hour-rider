@@ -80,8 +80,11 @@ export class TrafficSystem {
         return { id: junction.id, ...junction.position, phaseX: 'red', phaseZ: 'red', remainingX: 0, remainingZ: 0 }
       })
     const junctions = new Map(layout.intersections.map((junction) => [junction.id, junction]))
-    const routeIndices = [0, 3, 5, 6, 9, 10, 12, 15]
-    const starts = [24, 92, 225, 176, 64, 284, 118, 205]
+    // 覆盖 8×8 全城八大功能区的 14 条错峰单向巡航环线（共 28 辆车，零死锁零重叠）。
+    const routeIndices = layout.trafficRoutes.length >= 64
+      ? [1, 5, 10, 14, 17, 21, 26, 30, 33, 37, 42, 46, 51, 58]
+      : [0, 3, 5, 6, 9, 10, 12, 15].filter((index) => index < layout.trafficRoutes.length)
+    const starts = [24, 92, 225, 176, 64, 284, 118, 205, 42, 150, 260, 88, 196, 132]
     const colors = ['#da7958', '#62a2b8', '#e8bd58', '#80a387', '#b58ca6', '#e6ddbf']
     this.vehicles = routeIndices.flatMap((routeIndex, group) => {
       const route = layout.trafficRoutes[routeIndex]

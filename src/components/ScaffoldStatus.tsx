@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { Sun } from 'lucide-react'
 import { CITY_LAYOUT } from '../game/cityLayout'
 import { NAVIGATION_COLORS } from '../game/navigationSystem'
 import { HudBar } from './HudBar'
-import { MiniMap } from './MiniMap'
+import { MiniMap, type MiniMapMode } from './MiniMap'
 import type { GameEngine } from '../game/gameEngine'
 import type { CityView, EngineSnapshot, NavigationKind, RideCameraMode, RiderPreviewMode } from '../game/types'
 
@@ -11,9 +12,13 @@ const cityViews: { id: CityView; label: string }[] = [
   { id: 'rider-side', label: '骑手侧视' },
   { id: 'overview', label: '全城俯瞰' },
   { id: 'food-street', label: '烟火美食街' },
-  { id: 'old-neighborhood', label: '红砖小区' },
+  { id: 'night-market', label: '商业夜市' },
+  { id: 'old-neighborhood', label: '老旧红砖' },
+  { id: 'luxury-compound', label: '翡翠高端' },
   { id: 'cbd', label: '星辰 CBD' },
-  { id: 'civic-center', label: '医院与学园' },
+  { id: 'tech-park', label: '智谷科创' },
+  { id: 'civic-center', label: '医院学园' },
+  { id: 'university-town', label: '南城大学' },
 ]
 
 const cameraModes: { id: RideCameraMode; label: string }[] = [
@@ -55,6 +60,7 @@ interface ScaffoldStatusProps {
 export function ScaffoldStatus({
   engine, snapshot, muted, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onCycleCamera, onToggleMute, onResetRider,
 }: ScaffoldStatusProps) {
+  const [mapMode, setMapMode] = useState<MiniMapMode>('local')
   const view = snapshot?.view ?? 'ride'
   const cameraMode = snapshot?.cameraMode ?? 'near'
   const riderPreview = snapshot?.riderPreview ?? 'parked'
@@ -89,9 +95,21 @@ export function ScaffoldStatus({
         <section className="navigation-panel" aria-label="订单导航" style={{ borderTopColor: selectedTarget ? NAVIGATION_COLORS[selectedTarget.kind] : undefined }}>
           <header className="navigation-heading">
             <h2>街区导航</h2>
-            {isRiding ? <span>北向全城</span> : <button className="return-ride" type="button" data-view="ride" onClick={() => onViewChange('ride')}>返回骑行</button>}
+            {isRiding ? (
+              <button
+                className="map-mode-toggle"
+                type="button"
+                aria-pressed={mapMode === 'full'}
+                title="切换局部雷达跟随 / 全城 8×8 俯瞰"
+                onClick={() => setMapMode((current) => current === 'local' ? 'full' : 'local')}
+              >
+                {mapMode === 'local' ? '局部跟随' : '全城 8×8'}
+              </button>
+            ) : (
+              <button className="return-ride" type="button" data-view="ride" onClick={() => onViewChange('ride')}>返回骑行</button>
+            )}
           </header>
-          <MiniMap engine={engine} />
+          <MiniMap engine={engine} mode={mapMode} />
           <div className="navigation-legend" aria-label="地图图例">
             {navigationKinds.map(({ kind, label }) => <span key={kind}><i data-kind={kind} style={{ backgroundColor: NAVIGATION_COLORS[kind] }} />{label}</span>)}
           </div>
