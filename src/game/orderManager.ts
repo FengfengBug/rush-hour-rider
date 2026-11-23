@@ -487,7 +487,7 @@ export class OrderManager {
     // 8×8 路网折算：直线 × 1.18 近似路口绕行；+26s 基础取餐/等灯；进楼/门禁额外时间计入平台限时。
     // 这样“平台理想”不再把 CBD 进楼、 高端小区门禁当成零成本，普通骑行才有真实机会准时。
     const accessSec = this.deliveryProfile(this.landmarks.get(deliveryId)!).deliveryExtraSec
-    return { idealDistance, idealSec: Math.max(50, Math.ceil(idealDistance * 1.18 / 5.4 + 26 + accessSec)) }
+    return { idealDistance, idealSec: Math.max(55, Math.ceil(idealDistance * 1.18 / 5.4 + 26 + accessSec)) }
   }
 
   private createOffer(merchant: CityLandmark, destination: CityLandmark, rider: Point2, at: number): void {
