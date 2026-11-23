@@ -27,7 +27,7 @@ import { EventSystem, type EventResolution } from './eventSystem'
 import { InteriorScene } from './interiorScene'
 import { WeatherSystem } from './weatherSystem'
 import { AudioEngine } from './audioEngine'
-import type { CityLandmark, CityView, Direction, EngineSnapshot, InteriorTheme, NavigationFrameListener, OrderReportReason, RideCameraMode, RiderPreviewMode } from './types'
+import type { CityLandmark, CityView, Direction, EngineSnapshot, GameMode, InteriorTheme, NavigationFrameListener, OrderReportReason, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
   'food-street': 'shaxian-snacks',
@@ -102,6 +102,9 @@ export class GameEngine {
   private view: CityView = 'ride'
   private cameraMode: RideCameraMode = 'near'
   private riderPreview: RiderPreviewMode = 'parked'
+  private started = false
+  private gameMode: GameMode = 'challenge'
+  private titleElapsed = 0
   private muted = false
   private phoneOpen = false
   private shiftElapsed = 0
@@ -275,6 +278,27 @@ export class GameEngine {
     this.weather.toggleManualWeather()
     this.lastSnapshotTime = 0
     this.focusCanvas()
+  }
+
+  startSession(mode: GameMode) {
+    this.audio.unlock()
+    this.gameMode = mode
+    this.started = true
+    this.resetRider()
+    this.audio.playNewOrder()
+    this.lastSnapshotTime = 0
+    this.focusCanvas()
+  }
+
+  returnToTitle() {
+    this.clearInput()
+    this.started = false
+    this.titleElapsed = 0
+    this.interior.exit()
+    this.weather.reset()
+    this.view = 'ride'
+    this.navigationVisuals.root.visible = false
+    this.lastSnapshotTime = 0
   }
 
   setPhoneOpen(open: boolean) {
@@ -615,7 +639,7 @@ export class GameEngine {
   }
 
   private readonly onCanvasPointerMove = (event: PointerEvent) => {
-    if (this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
+    if (!this.started || this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
     if (event.pointerType === 'touch') return
     const rect = this.renderer.domElement.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
@@ -627,13 +651,13 @@ export class GameEngine {
   }
 
   private readonly onCanvasWheel = (event: WheelEvent) => {
-    if (this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
+    if (!this.started || this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
     event.preventDefault()
     this.followCamera.zoomBy(event.deltaY)
   }
 
   private readonly onCanvasDoubleClick = () => {
-    if (this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
+    if (!this.started || this.view !== 'ride' || this.eventSystem.hasActiveEvent) return
     this.followCamera.resetOrbit()
   }
 
@@ -652,6 +676,7 @@ export class GameEngine {
 
   private readonly onKeyDown = (event: KeyboardEvent) => {
     this.audio.unlock()
+    if (!this.started) return
     if (event.ctrlKey || event.metaKey || event.altKey) return
     if (this.eventSystem.hasActiveEvent) return
     if (this.interior.mode === 'photo') {
@@ -756,14 +781,30 @@ export class GameEngine {
   private readonly tick = (time: number) => {
     const deltaSeconds = Math.max(0, Math.min((time - this.previousTime) / 1000, 0.05))
     this.previousTime = time
-    const shiftActive = this.view === 'ride' && !document.hidden && !this.shiftEnded
+    const isChallenge = this.gameMode === 'challenge'
+    const shiftActive = this.started && this.view === 'ride' && !document.hidden && !this.shiftEnded
     const eventBlocking = this.eventSystem.hasActiveEvent
-    const insideBuilding = this.interior.mode !== 'none'
-    if (insideBuilding) {
+    const insideBuilding = this.started && this.interior.mode !== 'none'
+    if (!this.started) {
+      this.distractionActive = false
+      this.distractionLevel = 0
+      if (!document.hidden) {
+        this.titleElapsed += deltaSeconds
+        this.traffic.update(deltaSeconds)
+        this.trafficVisuals.update(deltaSeconds)
+      }
+      const center = { x: this.controller.state.x + 12, z: this.controller.state.z - 8 }
+      this.followCamera.updateTitleOrbit(center, this.titleElapsed)
+      this.sunlight.target.position.set(center.x, 0, center.z)
+      this.sunlight.position.set(center.x - 260, 420, center.z + 240)
+      this.sunlight.shadow.needsUpdate = true
+    } else if (insideBuilding) {
       this.distractionActive = false
       this.distractionLevel = 0
       if (shiftActive) {
-        const stepSeconds = Math.min(deltaSeconds, Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed))
+        const stepSeconds = isChallenge
+          ? Math.min(deltaSeconds, Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed))
+          : deltaSeconds
         this.shiftElapsed += stepSeconds
         this.eventSystem.updateRidingCooldown(stepSeconds)
         this.traffic.update(stepSeconds)
@@ -779,7 +820,7 @@ export class GameEngine {
         })
         const shouldAutoExit = this.interior.update(stepSeconds, { forward, strafe }, this.controller.state.stamina <= 20)
         if (shouldAutoExit) this.exitBuilding()
-        if (this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
+        if (isChallenge && this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
           this.shiftElapsed = SHIFT_DURATION_SECONDS
           this.shiftEnded = true
           if (this.interior.mode === 'photo') this.interior.closePhotoMode()
@@ -788,7 +829,9 @@ export class GameEngine {
         }
       }
     } else if (shiftActive && !eventBlocking) {
-      const stepSeconds = Math.min(deltaSeconds, Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed))
+      const stepSeconds = isChallenge
+        ? Math.min(deltaSeconds, Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed))
+        : deltaSeconds
       this.shiftElapsed += stepSeconds
       this.eventSystem.updateRidingCooldown(stepSeconds)
       const previousPosition = { x: this.controller.state.x, z: this.controller.state.z }
@@ -932,7 +975,7 @@ export class GameEngine {
       this.sunlight.target.position.copy(this.rider.root.position)
       this.sunlight.position.copy(this.sunlight.target.position).add({ x: -240, y: 410, z: 220 })
       this.sunlight.shadow.needsUpdate = true
-      if (!intercepted && this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
+      if (isChallenge && !intercepted && this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
         this.shiftElapsed = SHIFT_DURATION_SECONDS
         this.shiftEnded = true
         this.distractionActive = false
@@ -961,7 +1004,10 @@ export class GameEngine {
       }
       this.controls.update(deltaSeconds)
     }
-    this.weather.update(deltaSeconds, this.shiftElapsed / SHIFT_DURATION_SECONDS, this.controller.state, this.interior.mode === 'none')
+    const weatherProgress = isChallenge
+      ? this.shiftElapsed / SHIFT_DURATION_SECONDS
+      : (this.shiftElapsed % SHIFT_DURATION_SECONDS) / SHIFT_DURATION_SECONDS
+    this.weather.update(deltaSeconds, this.started ? weatherProgress : 0, this.controller.state, this.interior.mode === 'none')
     this.weather.applyAtmosphere(
       this.scene,
       this.sunlight,
@@ -981,9 +1027,10 @@ export class GameEngine {
       this.renderer.render(this.interior.scene, this.interior.camera)
     } else {
       if (!shiftActive || eventBlocking) this.updateRider()
-      this.navigationVisuals.update(deltaSeconds, this.controller.state, this.navigation.snapshot, this.view === 'ride')
+      this.navigationVisuals.root.visible = this.started && this.view !== 'rider-rear' && this.view !== 'rider-side'
+      this.navigationVisuals.update(deltaSeconds, this.controller.state, this.navigation.snapshot, this.started && this.view === 'ride')
       this.navigationFrameListener?.(this.controller.state, this.navigation.snapshot)
-      this.world.updateCanopyOcclusion(this.followCamera.camera.position, this.view === 'ride' ? this.rider.root.position : null, deltaSeconds)
+      this.world.updateCanopyOcclusion(this.followCamera.camera.position, this.started && this.view === 'ride' ? this.rider.root.position : null, deltaSeconds)
       this.renderer.render(this.scene, this.view === 'ride' ? this.followCamera.camera : this.previewCamera)
     }
     this.sampleFrames += 1
@@ -1014,10 +1061,12 @@ export class GameEngine {
         riderPreview: this.riderPreview,
         muted: this.muted,
         shift: {
+          started: this.started,
+          mode: this.gameMode,
           durationSec: SHIFT_DURATION_SECONDS,
           elapsedSec: this.shiftElapsed,
-          remainingSec: Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed),
-          clockLabel: formatShiftClock(this.shiftElapsed),
+          remainingSec: isChallenge ? Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed) : SHIFT_DURATION_SECONDS,
+          clockLabel: formatShiftClock(isChallenge ? this.shiftElapsed : this.shiftElapsed % SHIFT_DURATION_SECONDS),
           ended: this.shiftEnded,
         },
         distraction: {

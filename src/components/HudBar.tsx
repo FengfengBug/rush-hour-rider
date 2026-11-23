@@ -23,6 +23,7 @@ interface HudBarProps {
   onToggleWeather: () => void
   onToggleMute: () => void
   onResetRider: () => void
+  onReturnToTitle: () => void
 }
 
 const CAMERA_LABELS: Record<RideCameraMode, string> = {
@@ -47,6 +48,7 @@ export function HudBar({
   onToggleWeather,
   onToggleMute,
   onResetRider,
+  onReturnToTitle,
 }: HudBarProps) {
   const shift = snapshot?.shift
   const rider = snapshot?.rider
@@ -56,6 +58,7 @@ export function HudBar({
   const weather = snapshot?.weather
   const cameraMode = snapshot?.cameraMode ?? 'near'
   const raining = weather?.raining ?? false
+  const isFreeMode = shift?.mode === 'free'
 
   const completed = orders?.completed ?? []
   const completedCount = completed.length
@@ -66,15 +69,20 @@ export function HudBar({
 
   const battery = rider ? Math.max(0, Math.min(100, rider.battery)) : 100
   const stamina = rider ? Math.max(0, Math.min(100, rider.stamina)) : 100
-  const shiftProgress = shift && shift.durationSec > 0
+  const shiftProgress = !isFreeMode && shift && shift.durationSec > 0
     ? Math.max(0, Math.min(100, (shift.elapsedSec / shift.durationSec) * 100))
     : 0
-  const clockUrgent = !!shift && !shift.ended && shift.remainingSec <= 30
+  const clockUrgent = !isFreeMode && !!shift && !shift.ended && shift.remainingSec <= 30
 
   return (
     <div className="hud-top-stack">
       <header className="hud-bar" aria-label="午高峰顶部状态栏">
-        <div className="hud-brand">
+        <button
+          type="button"
+          className="hud-brand"
+          title="返回开局主界面切换游玩模式"
+          onClick={onReturnToTitle}
+        >
           <span className="hud-brand-icon" aria-hidden="true">
             <Bike size={20} />
           </span>
@@ -82,24 +90,31 @@ export function HudBar({
             <h1>午高峰</h1>
             <p>RUSH HOUR RIDER</p>
           </div>
-        </div>
+        </button>
 
         <div className="hud-metrics" role="group" aria-label="班次与骑手状态">
           <div
             className="hud-metric hud-metric--clock"
             data-urgent={clockUrgent}
             data-ended={shift?.ended ?? false}
-            title={shift ? `午高峰模拟时段 11:30 → 13:30（本局总长 3.5 分钟，已用 ${Math.floor(shift.elapsedSec)} 秒）` : '午高峰模拟时钟'}
+            data-free={isFreeMode}
+            title={
+              isFreeMode
+                ? '自由骑行体验模式（无班次结束倒计时，点击左上角可切回挑战模式）'
+                : shift
+                  ? `午高峰模拟时段 11:30 → 13:30（本局总长 3.5 分钟，已用 ${Math.floor(shift.elapsedSec)} 秒）`
+                  : '午高峰模拟时钟'
+            }
           >
             <div className="hud-clock-row">
               <Clock size={14} aria-hidden="true" />
               <strong className="hud-clock-time">{shift?.clockLabel ?? '11:30'}</strong>
               <span className="hud-clock-rem">
-                {shift?.ended ? '已收工' : `剩 ${formatCountdown(shift?.remainingSec ?? 210)}`}
+                {isFreeMode ? '自由模式' : shift?.ended ? '已收工' : `剩 ${formatCountdown(shift?.remainingSec ?? 210)}`}
               </span>
             </div>
             <div className="hud-progress-track" aria-hidden="true">
-              <span style={{ width: `${shiftProgress}%` }} />
+              <span style={{ width: isFreeMode ? '100%' : `${shiftProgress}%` }} />
             </div>
           </div>
 

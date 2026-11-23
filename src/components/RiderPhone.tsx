@@ -98,10 +98,11 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
   const focusCloseOnOpen = useRef(false)
   const panelId = useId()
   const orders = snapshot?.orders
+  const started = snapshot?.shift.started ?? false
   const shiftEnded = snapshot?.shift.ended ?? false
   const interior = snapshot?.interior
   const photoMode = interior?.mode === 'photo'
-  const eventBlocking = !!snapshot?.events.active || photoMode
+  const eventBlocking = !started || !!snapshot?.events.active || photoMode
   const elapsed = orders?.elapsedSec ?? 0
   const active = orders?.active ?? []
   const offers = orders?.offers ?? []

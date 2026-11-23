@@ -4,8 +4,10 @@ import { ScaffoldStatus } from './components/ScaffoldStatus'
 import { RiderPhone } from './components/RiderPhone'
 import { EventModal } from './components/EventModal'
 import { DeliveryCameraOverlay } from './components/DeliveryCameraOverlay'
+import { StartOverlay } from './components/StartOverlay'
+import { ControlsHint } from './components/ControlsHint'
 import type { GameEngine } from './game/gameEngine'
-import type { CityView, EngineSnapshot, RideCameraMode, RiderPreviewMode } from './game/types'
+import type { CityView, EngineSnapshot, GameMode, RideCameraMode, RiderPreviewMode } from './game/types'
 import './App.css'
 
 const MUTE_STORAGE_KEY = 'rush-hour-rider:muted'
@@ -66,6 +68,17 @@ export default function App() {
     engine?.resetRider()
   }
 
+  function startSession(mode: GameMode) {
+    setPhoneOpen(false)
+    engine?.startSession(mode)
+  }
+
+  function returnToTitle() {
+    setPhoneOpen(false)
+    engine?.returnToTitle()
+  }
+
+  const started = snapshot?.shift.started ?? false
   const distractionLevel = snapshot?.distraction.level ?? 0
   const distractionActive = snapshot?.distraction.active ?? false
   const distractionStyle = {
@@ -78,7 +91,7 @@ export default function App() {
       <div
         className="distraction-vignette"
         aria-hidden="true"
-        data-active={distractionLevel > 0.01}
+        data-active={started && distractionLevel > 0.01}
         style={distractionStyle}
       />
       <ScaffoldStatus
@@ -93,16 +106,21 @@ export default function App() {
         onToggleWeather={toggleWeather}
         onToggleMute={toggleMute}
         onResetRider={resetRider}
+        onReturnToTitle={returnToTitle}
       />
-      <RiderPhone
-        key={snapshot?.orders.shiftId ?? 0}
-        engine={engine}
-        snapshot={snapshot}
-        open={phoneOpen}
-        onOpenChange={setPhoneOpen}
-      />
-      <EventModal engine={engine} snapshot={snapshot} />
-      <DeliveryCameraOverlay engine={engine} snapshot={snapshot} />
+      {started && (
+        <RiderPhone
+          key={snapshot?.orders.shiftId ?? 0}
+          engine={engine}
+          snapshot={snapshot}
+          open={phoneOpen}
+          onOpenChange={setPhoneOpen}
+        />
+      )}
+      <ControlsHint snapshot={snapshot} />
+      {started && <EventModal engine={engine} snapshot={snapshot} />}
+      {started && <DeliveryCameraOverlay engine={engine} snapshot={snapshot} />}
+      <StartOverlay visible={!started} initialMode={snapshot?.shift.mode ?? 'challenge'} onStart={startSession} />
     </main>
   )
 }

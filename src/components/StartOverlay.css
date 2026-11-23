@@ -1,0 +1,300 @@
+.start-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  pointer-events: auto;
+}
+
+.start-scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 48%, rgba(23, 33, 25, 0.14) 0%, rgba(20, 29, 23, 0.48) 100%);
+  pointer-events: none;
+}
+
+.start-card,
+.start-card * {
+  box-sizing: border-box;
+}
+
+.start-card {
+  position: relative;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  border: 1px solid rgba(226, 230, 214, 0.85);
+  border-top: 4px solid #f0b936;
+  border-radius: 22px;
+  color: #273327;
+  background: rgba(252, 249, 240, 0.88);
+  backdrop-filter: blur(14px) saturate(1.12);
+  -webkit-backdrop-filter: blur(14px) saturate(1.12);
+  box-shadow: 0 28px 64px rgba(15, 24, 18, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  animation: start-card-in 240ms cubic-bezier(0.18, 0.88, 0.3, 1.04);
+}
+
+.start-top-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  color: #6b4c10;
+  background: rgba(253, 233, 174, 0.88);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.start-header {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 12px;
+}
+
+.start-logo {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  color: #2c3128;
+  background: linear-gradient(135deg, #ffe285, #f4bc3b);
+  box-shadow: 0 6px 16px rgba(186, 134, 24, 0.28), inset 0 0 0 1px rgba(154, 118, 28, 0.22);
+}
+
+.start-title {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1.18;
+  letter-spacing: -0.04em;
+  color: #212c22;
+}
+
+.start-subtitle {
+  margin: 3px 0 0;
+  color: #616d58;
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+}
+
+.start-quote {
+  margin: 13px 0 16px;
+  padding: 9px 12px;
+  border-left: 3px solid #e5b23a;
+  border-radius: 0 10px 10px 0;
+  color: #3d4a3b;
+  background: rgba(244, 238, 220, 0.65);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.start-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.start-mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 13px;
+  border: 1.5px solid #d5dac7;
+  border-radius: 14px;
+  color: #293529;
+  background: rgba(255, 254, 249, 0.85);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 110ms ease, border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.start-mode-card:hover {
+  transform: translateY(-1px);
+  border-color: #b7c2a7;
+  box-shadow: 0 6px 14px rgba(24, 36, 26, 0.1);
+}
+
+.start-mode-card[data-selected="true"] {
+  border-color: #d79e28;
+  background: #fff9e5;
+  box-shadow: 0 0 0 3px rgba(235, 181, 56, 0.22);
+}
+
+.start-mode-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.start-mode-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13.5px;
+  font-weight: 850;
+  color: #222e23;
+}
+
+.start-mode-rec,
+.start-mode-tag {
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.start-mode-rec {
+  color: #6b4707;
+  background: #ffd972;
+}
+
+.start-mode-tag {
+  color: #295c4e;
+  background: #dfefe7;
+}
+
+.start-mode-card p {
+  margin: 0;
+  color: #556252;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.start-keys {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 14px;
+  padding: 10px 11px;
+  border: 1px solid #dfe4d3;
+  border-radius: 13px;
+  background: rgba(245, 243, 233, 0.72);
+}
+
+.start-key-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #465344;
+  min-width: 0;
+}
+
+.start-key-item kbd {
+  flex: none;
+  padding: 2px 6px;
+  border: 1px solid #b9bfaa;
+  border-radius: 6px;
+  color: #2b362a;
+  background: #fffdf6;
+  box-shadow: 0 1px 0 #b9bfaa;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.start-key-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.start-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.start-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 18px;
+  border: 1.5px solid #c99724;
+  border-radius: 13px;
+  color: #2d2612;
+  background: linear-gradient(135deg, #ffe27f, #f5be38);
+  box-shadow: 0 10px 24px rgba(186, 134, 24, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 100ms ease, filter 120ms ease, box-shadow 120ms ease;
+}
+
+.start-cta:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+  box-shadow: 0 14px 28px rgba(186, 134, 24, 0.42);
+}
+
+.start-cta:active {
+  transform: scale(0.99);
+}
+
+.start-cta kbd {
+  padding: 2px 7px;
+  border: 1px solid rgba(124, 88, 12, 0.4);
+  border-radius: 6px;
+  color: #5b4008;
+  background: rgba(255, 250, 232, 0.72);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.start-tip {
+  margin: 0;
+  color: #67725e;
+  font-size: 11px;
+  text-align: center;
+}
+
+@keyframes start-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 600px) {
+  .start-card {
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .start-title {
+    font-size: 20px;
+  }
+
+  .start-modes {
+    grid-template-columns: 1fr;
+  }
+
+  .start-keys {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-card {
+    animation: none;
+  }
+}

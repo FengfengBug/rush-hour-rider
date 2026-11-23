@@ -56,10 +56,11 @@ interface ScaffoldStatusProps {
   onToggleWeather: () => void
   onToggleMute: () => void
   onResetRider: () => void
+  onReturnToTitle: () => void
 }
 
 export function ScaffoldStatus({
-  engine, snapshot, muted, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onCycleCamera, onToggleWeather, onToggleMute, onResetRider,
+  engine, snapshot, muted, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onCycleCamera, onToggleWeather, onToggleMute, onResetRider, onReturnToTitle,
 }: ScaffoldStatusProps) {
   const [mapMode, setMapMode] = useState<MiniMapMode>('local')
   const view = snapshot?.view ?? 'ride'
@@ -84,7 +85,7 @@ export function ScaffoldStatus({
     onRiderPreviewChange(mode)
   }
 
-  if (interiorMode === 'photo') return null
+  if (!snapshot?.shift.started || interiorMode === 'photo') return null
 
   return (
     <div className="scene-overlay">
@@ -95,6 +96,7 @@ export function ScaffoldStatus({
         onToggleWeather={onToggleWeather}
         onToggleMute={onToggleMute}
         onResetRider={onResetRider}
+        onReturnToTitle={onReturnToTitle}
       />
 
       {isInside ? <div /> : (

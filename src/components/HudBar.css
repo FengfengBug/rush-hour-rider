@@ -36,6 +36,18 @@
   align-items: center;
   gap: 8px;
   flex: none;
+  padding: 2px 6px 2px 2px;
+  border: 0;
+  border-radius: 10px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.hud-brand:hover {
+  background: rgba(235, 187, 68, 0.16);
 }
 
 .hud-brand-icon {
@@ -95,6 +107,20 @@
 .hud-metric--clock[data-urgent="true"] {
   border-color: #dfada2;
   background: #fdf0ec;
+}
+
+.hud-metric--clock[data-free="true"] {
+  border-color: #bcd6cb;
+  background: #edf6f2;
+}
+
+.hud-metric--clock[data-free="true"] .hud-clock-rem {
+  color: #215b4b;
+  background: #d7eee5;
+}
+
+.hud-metric--clock[data-free="true"] .hud-progress-track > span {
+  background: linear-gradient(90deg, #4b997a, #3b8293);
 }
 
 .hud-metric--clock[data-ended="true"] {

@@ -86,6 +86,20 @@ export class FollowCamera {
     this.zoomScale = 1
   }
 
+  /** 开局主界面实时缓动环绕镜头，展示鲜活的 8×8 微缩中国街区与动态车流 */
+  updateTitleOrbit(center: Point2, elapsedSeconds: number): void {
+    const angle = 0.55 + elapsedSeconds * 0.11
+    const radius = 54 + Math.sin(elapsedSeconds * 0.24) * 6
+    const height = 27 + Math.sin(elapsedSeconds * 0.31) * 3.5
+    this.camera.position.set(
+      center.x + Math.cos(angle) * radius,
+      height,
+      center.z + Math.sin(angle) * radius,
+    )
+    this.lookAtPoint.set(center.x, 4.2, center.z)
+    this.camera.lookAt(this.lookAtPoint)
+  }
+
   reset(position: Point2, heading: number): void {
     this.heading = wrapAngle(heading)
     this.resetOrbit()

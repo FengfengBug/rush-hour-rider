@@ -306,7 +306,11 @@ export interface OrderSnapshot {
   notice: string
 }
 
+export type GameMode = 'challenge' | 'free'
+
 export interface ShiftSnapshot {
+  started: boolean
+  mode: GameMode
   durationSec: number
   elapsedSec: number
   remainingSec: number
