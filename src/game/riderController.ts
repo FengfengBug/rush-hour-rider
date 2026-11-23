@@ -110,22 +110,22 @@ export class RiderController {
     const reversing = input.throttle * speed < -0.1
     const lowBattery = state.battery > 0 && state.battery < 20
     const boost = input.boost && input.throttle > 0 && speed >= 0 && state.battery >= 20 && !input.brake
-    const forwardTopSpeed = lowBattery ? 6.2 : boost ? 15 : 10
+    const forwardTopSpeed = lowBattery ? 6.4 : boost ? 16.2 : 11.4
     state.braking = input.brake || reversing
     if (state.braking) {
       // 雨天路面湿滑：刹车减速度降低约 36%，制动距离明显变长但线性可控。
-      const brakeDecel = (input.brake ? 16 : 9) * (1 - 0.36 * rain)
+      const brakeDecel = (input.brake ? 16.5 : 9.2) * (1 - 0.36 * rain)
       speed = approach(speed, 0, brakeDecel * dt)
     } else if (input.throttle !== 0 && state.battery > 0) {
-      const target = input.throttle * (input.throttle < 0 ? 3 : forwardTopSpeed)
-      const acceleration = Math.abs(speed) > Math.abs(target) ? 3.2 : boost ? 9.5 : lowBattery ? 4.8 : 6.8
+      const target = input.throttle * (input.throttle < 0 ? 3.2 : forwardTopSpeed)
+      const acceleration = Math.abs(speed) > Math.abs(target) ? 3.4 : boost ? 10.8 : lowBattery ? 5.2 : 7.8
       speed = approach(speed, target, acceleration * dt)
     } else {
-      speed = approach(speed, 0, (1.1 + Math.abs(speed) * 0.12) * dt)
+      speed = approach(speed, 0, (1.15 + Math.abs(speed) * 0.12) * dt)
     }
 
     const steeringScale = 1 - 0.42 * distraction
-    const steeringResponse = 11 - 5.6 * distraction
+    const steeringResponse = 12.5 - 6.1 * distraction
     const driftBias = distraction > 0 && Math.abs(speed) > 1.2
       ? Math.sin(distractionTime * 2.2) * 0.055 * distraction * Math.min(1, Math.abs(speed) / 8)
       : 0
@@ -211,7 +211,7 @@ export class RiderController {
     this.touchingWall = hitX || hitZ
     if (this.touchingWall) {
       state.colliding = true
-      const friction = Math.exp(-0.8 * dt)
+      const friction = Math.exp(-0.55 * dt)
       state.velocityX *= friction
       state.velocityZ *= friction
     }

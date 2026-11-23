@@ -470,7 +470,8 @@ export class OrderManager {
     const merchant = this.landmarks.get(merchantId)!.access.position
     const delivery = this.landmarks.get(deliveryId)!.access.position
     const idealDistance = distance(rider, merchant) + distance(merchant, delivery)
-    return { idealDistance, idealSec: Math.max(34, Math.ceil(idealDistance / 6.8 + 18)) }
+    // 适配 8×8 街区路网折算：正常骑行稳准时，遭遇卡餐/等灯/多单并发时切入紧迫区间
+    return { idealDistance, idealSec: Math.max(40, Math.ceil(idealDistance / 5.4 + 24)) }
   }
 
   private createOffer(merchant: CityLandmark, destination: CityLandmark, rider: Point2, at: number): void {
@@ -487,10 +488,10 @@ export class OrderManager {
     if (this.offers.length >= 3) this.offers.shift()
     const allCandidates = this.merchants.flatMap((merchant) => this.destinations.map((destination) => ({ merchant, destination })))
       .filter(({ merchant, destination }) => ![...this.offers, ...this.active].some((order) => order.merchantId === merchant.id && order.deliveryId === destination.id))
-    // 8×8 扩容大城下优先派送合理半径内的近中程单，避免跨 720m 全图导致无解超时。
+    // 8×8 扩容大城下优先派送 1–3 个街区半径内的中短程单，保障 3.5 分钟节奏紧凑顺畅。
     const localCandidates = allCandidates.filter(({ merchant, destination }) => (
-      distance(rider, merchant.access.position) <= 270
-      && distance(merchant.access.position, destination.access.position) <= 340
+      distance(rider, merchant.access.position) <= 220
+      && distance(merchant.access.position, destination.access.position) <= 270
     ))
     const pool = localCandidates.length > 0 ? localCandidates : allCandidates
     const pair = pool[Math.floor(this.random() * pool.length)]

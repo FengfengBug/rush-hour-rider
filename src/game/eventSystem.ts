@@ -10,8 +10,9 @@ import type {
   IncomingCallState,
 } from './types'
 
-const EVENT_COOLDOWN_SEC = 10
-const ADDON_COOLDOWN_SEC = 45
+const EVENT_COOLDOWN_SEC = 24
+const CALL_COOLDOWN_SEC = 28
+const ADDON_COOLDOWN_SEC = 48
 const MAX_ADDON_OFFERS = 2
 const INCOMING_CALL_SEC = 12.0
 const SPRINT_DURATION_SEC = 3.0
@@ -78,7 +79,7 @@ function buildEventCard(
             keyHint: '1',
             label: '死等出餐',
             summary: '原地催促等打包，稳稳取餐继续送',
-            tags: ['预计 +11~17 秒', '记入卡餐账本'],
+            tags: ['预计 +9~14 秒', '记入卡餐账本'],
             tone: 'safe',
           },
           {
@@ -140,7 +141,7 @@ function buildEventCard(
             keyHint: '1',
             label: '排队等电梯',
             summary: '原地省力等梯，但耗时随机波动很大',
-            tags: ['预计 +10~22 秒', '不耗体力'],
+            tags: ['预计 +9~18 秒', '不耗体力'],
             tone: 'safe',
           },
           {
@@ -260,7 +261,8 @@ export class EventSystem {
   private batterySwap: BatterySwapState | null = null
   private latestOutcome: EventOutcome | null = null
   private cooldownSec = 0
-  private addonCooldownSec = 14
+  private callCooldownSec = 0
+  private addonCooldownSec = 20
   private addonOfferCount = 0
   private waitingAtRedLightSec = 0
   private lowBatteryWarning = false
@@ -286,7 +288,8 @@ export class EventSystem {
     this.batterySwap = null
     this.latestOutcome = null
     this.cooldownSec = 0
-    this.addonCooldownSec = 14
+    this.callCooldownSec = 0
+    this.addonCooldownSec = 20
     this.addonOfferCount = 0
     this.waitingAtRedLightSec = 0
     this.lowBatteryWarning = false
@@ -314,6 +317,9 @@ export class EventSystem {
   updateRidingCooldown(deltaSeconds: number): void {
     if (this.cooldownSec > 0) {
       this.cooldownSec = Math.max(0, this.cooldownSec - deltaSeconds)
+    }
+    if (this.callCooldownSec > 0) {
+      this.callCooldownSec = Math.max(0, this.callCooldownSec - deltaSeconds)
     }
     if (this.addonCooldownSec > 0) {
       this.addonCooldownSec = Math.max(0, this.addonCooldownSec - deltaSeconds)
@@ -409,8 +415,9 @@ export class EventSystem {
   }
 
   tryTriggerIncomingCall(orderId: string, deliveryName: string, hasMerchantDelay: boolean): boolean {
-    if (this.activeEvent || this.incomingCall || this.calledOrderIds.has(orderId)) return false
+    if (this.activeEvent || this.incomingCall || this.callCooldownSec > 0 || this.calledOrderIds.has(orderId)) return false
     this.calledOrderIds.add(orderId)
+    this.callCooldownSec = CALL_COOLDOWN_SEC
     this.triggeredCount += 1
     this.incomingCall = {
       id: ++this.callSeq,
@@ -519,8 +526,8 @@ export class EventSystem {
     if (candidates.length === 0) return false
 
     const triggerChance = this.triggeredCount === 0
-      ? (phase === 'delivery' ? 1 : 0.68)
-      : 0.72
+      ? (phase === 'delivery' ? 1 : 0.62)
+      : 0.52
     if (this.random() > triggerChance) return false
 
     const unseen = candidates.filter((kind) => !this.seenKinds.has(kind))
@@ -594,7 +601,7 @@ export class EventSystem {
 
     if (kind === 'merchant-backlog') {
       if (choiceIndex === 0) {
-        const waitSec = 11 + Math.round(this.random() * 6)
+        const waitSec = 9 + Math.round(this.random() * 5)
         return this.commitResolution({
           orderId,
           phase,
@@ -650,7 +657,7 @@ export class EventSystem {
 
     if (kind === 'cbd-elevator-jam') {
       if (choiceIndex === 0) {
-        const waitSec = 10 + Math.round(this.random() * 12)
+        const waitSec = 9 + Math.round(this.random() * 9)
         return this.commitResolution({
           orderId,
           phase,

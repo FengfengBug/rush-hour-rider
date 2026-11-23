@@ -717,7 +717,7 @@ export class GameEngine {
 
   private readonly onKeyDown = (event: KeyboardEvent) => {
     this.audio.unlock()
-    if (!this.started) return
+    if (!this.started || this.shiftEnded) return
     if (event.ctrlKey || event.metaKey || event.altKey) return
     if (this.eventSystem.hasActiveEvent) return
     if (this.interior.mode === 'photo') {
