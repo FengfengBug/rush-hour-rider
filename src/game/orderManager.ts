@@ -352,9 +352,13 @@ export class OrderManager {
     if (resolution.timeCostSec > 0 && resolution.ledgerKey) {
       for (const order of this.active) {
         if (resolution.action === 'transfer-order' && order.id === target.id) continue
-        order.ledger[resolution.ledgerKey] += resolution.timeCostSec
-        order.actualSec += resolution.timeCostSec
-        order.deadline -= resolution.timeCostSec
+        // 事件耗时对“当事单”全额计入；对同车其他订单只计 50% 连带等待。
+        // 否则一次 13–18s 的卡餐/门禁会同时击穿 2–3 单的 deadline，导致整局 0% 准时。
+        const share = order.id === target.id ? 1 : 0.5
+        const cost = resolution.timeCostSec * share
+        order.ledger[resolution.ledgerKey] += cost
+        order.actualSec += cost
+        order.deadline -= cost
         const reminderAt = Math.max(order.acceptedAt, order.deadline - 15)
         if (!this.reminded.has(order.id) && this.elapsed >= reminderAt) {
           this.reminded.add(order.id)
@@ -480,8 +484,10 @@ export class OrderManager {
     const merchant = this.landmarks.get(merchantId)!.access.position
     const delivery = this.landmarks.get(deliveryId)!.access.position
     const idealDistance = distance(rider, merchant) + distance(merchant, delivery)
-    // 适配 8×8 街区路网折算：正常骑行稳准时，遭遇卡餐/等灯/多单并发时切入紧迫区间
-    return { idealDistance, idealSec: Math.max(40, Math.ceil(idealDistance / 5.4 + 24)) }
+    // 8×8 路网折算：直线 × 1.18 近似路口绕行；+26s 基础取餐/等灯；进楼/门禁额外时间计入平台限时。
+    // 这样“平台理想”不再把 CBD 进楼、 高端小区门禁当成零成本，普通骑行才有真实机会准时。
+    const accessSec = this.deliveryProfile(this.landmarks.get(deliveryId)!).deliveryExtraSec
+    return { idealDistance, idealSec: Math.max(50, Math.ceil(idealDistance * 1.18 / 5.4 + 26 + accessSec)) }
   }
 
   private createOffer(merchant: CityLandmark, destination: CityLandmark, rider: Point2, at: number): void {

@@ -54,7 +54,7 @@ function DeliveryAccessBadge({ access, kind, extraSec }: { access: DeliveryAcces
   return (
     <span className="rider-phone-access" data-access={access}>
       {deliveryAccessLabel(access, kind)}
-      {access !== 'direct' && <small>约 +{extraSec}s</small>}
+      {access !== 'direct' && <small>限时已含 +{extraSec}s</small>}
     </span>
   )
 }
@@ -299,7 +299,7 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
                   })}
                 </ul>
                 {offers.length === 0 && <div className="rider-phone-empty"><Inbox size={27} aria-hidden="true" /><strong>{orders ? '新订单正在路上' : '等待订单数据'}</strong><p>{orders ? `下次派单还有 ${Math.max(0, Math.ceil(orders.nextOfferInSec))} 秒${orders.paused ? '（已冻结）' : ''}。` : '引擎就绪后，这里会显示真实派单。'}</p></div>}
-                <p className="rider-phone-footnote">限时来自直线估算，随位置更新、接单时锁定；实际收入以送达结算为准。</p>
+                <p className="rider-phone-footnote">限时 = 直线距离 × 路网系数 + 进楼/门禁缓冲，接单时锁定；实际收入以送达结算为准。</p>
               </section>
             )}
 

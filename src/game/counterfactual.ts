@@ -1,10 +1,11 @@
 import type { DeliveryOrder, EngineSnapshot, OrderTimeLedger } from './types'
 
 /**
- * 班次时间刻度映射：本局 3.5 分钟（210 秒）模拟现实午高峰 120 分钟（11:30–13:30）。
- * 订单层面按配送体验换算：现实每多给 1 分钟缓冲 ≈ 局内每单 +2.5 秒缓冲（+5 分钟 = +12.5 秒/单）。
+ * 订单时间压缩尺度：现实每多给 1 分钟缓冲 ≈ 局内每单 +4 秒缓冲（+5 分钟 = +20 秒/单）。
+ * 班次 210 秒模拟 120 分钟，但订单限时是“单次配送体验”的独立压缩；
+ * 采用 4 秒/分钟是为了让 +5 分钟真正覆盖 10–20 秒级的真实超时缺口，而不是只做心理安慰。
  */
-export const SIM_SECONDS_PER_REAL_MINUTE = 2.5
+export const SIM_SECONDS_PER_REAL_MINUTE = 4
 
 export interface RiderTitleBadge {
   readonly title: string

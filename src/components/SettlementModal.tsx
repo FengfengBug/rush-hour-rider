@@ -122,7 +122,7 @@ export function SettlementModal({
             <em>{summary.activeCount > 0 ? `另有 ${summary.activeCount} 单在途` : `准时 ${summary.onTimeCount} · 超时 ${summary.lateCount}`}</em>
           </div>
           <div className="settlement-kpi" data-warn={summary.onTimeRate !== null && summary.onTimeRate < 80}>
-            <span>准时率</span>
+            <span>{extraMinutes > 0 ? '准时率（原算法）' : '准时率'}</span>
             <strong>{summary.onTimeRate !== null ? `${summary.onTimeRate}%` : '—'}</strong>
             <em>{summary.completedCount > 0 ? `${summary.onTimeCount} / ${summary.completedCount} 单准时` : '尚无完单记录'}</em>
           </div>
