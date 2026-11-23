@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
+  // 相对基址：无论部署在 Qoder Sites 根域名还是子路径，静态资源均可正确加载。
+  base: './',
   plugins: [react()],
   build: {
     target: 'es2022',

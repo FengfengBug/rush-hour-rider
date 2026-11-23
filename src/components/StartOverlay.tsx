@@ -49,80 +49,82 @@ export function StartOverlay({ visible, initialMode = 'challenge', onStart }: St
     <div className="start-overlay" role="dialog" aria-modal="true" aria-labelledby="start-title">
       <div className="start-scrim" aria-hidden="true" />
       <section className="start-card">
-        <div className="start-top-badge">
-          <Sparkles size={13} aria-hidden="true" />
-          <span>2026 Hack4Good · 3D 城市外卖体验模拟</span>
-        </div>
-
-        <header className="start-header">
-          <span className="start-logo" aria-hidden="true">
-            <Bike size={28} />
-          </span>
-          <div>
-            <h1 id="start-title" className="start-title">午高峰：外卖骑手模拟器</h1>
-            <p className="start-subtitle">RUSH HOUR RIDER · 11:30 – 13:30</p>
+        <div className="start-card-scroll">
+          <div className="start-top-badge">
+            <Sparkles size={13} aria-hidden="true" />
+            <span>2026 Hack4Good · 3D 城市外卖体验模拟</span>
           </div>
-        </header>
 
-        <p className="start-quote">
-          在算法划定的每一秒里，穿过红灯、电梯、物业门禁与午后阵雨，看见城市运转背后真实的时间成本。
-        </p>
-
-        {compactExperience && (
-          <div className="start-compact-hint" role="note">
-            <Smartphone size={16} aria-hidden="true" />
+          <header className="start-header">
+            <span className="start-logo" aria-hidden="true">
+              <Bike size={28} />
+            </span>
             <div>
-              <strong>手机 / 平板体验提示</strong>
-              <p>核心骑行需要实体键盘（WASD / 空格 / Tab，Esc 暂停）。建议使用电脑体验；横屏可看到更完整的街区画面。</p>
+              <h1 id="start-title" className="start-title">午高峰：外卖骑手模拟器</h1>
+              <p className="start-subtitle">RUSH HOUR RIDER · 11:30 – 13:30</p>
             </div>
+          </header>
+
+          <p className="start-quote">
+            在算法划定的每一秒里，穿过红灯、电梯、物业门禁与午后阵雨，看见城市运转背后真实的时间成本。
+          </p>
+
+          {compactExperience && (
+            <div className="start-compact-hint" role="note">
+              <Smartphone size={16} aria-hidden="true" />
+              <div>
+                <strong>手机 / 平板体验提示</strong>
+                <p>核心骑行需要实体键盘（WASD / 空格 / Tab，Esc 暂停）。建议使用电脑体验；横屏可看到更完整的街区画面。</p>
+              </div>
+            </div>
+          )}
+
+          <div className="start-modes" role="radiogroup" aria-label="选择游玩模式">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={mode === 'challenge'}
+              className="start-mode-card"
+              data-selected={mode === 'challenge'}
+              onClick={() => setMode('challenge')}
+            >
+              <div className="start-mode-head">
+                <span className="start-mode-title">
+                  <Timer size={15} aria-hidden="true" />
+                  午高峰 3.5 分钟挑战
+                </span>
+                <em className="start-mode-rec">推荐</em>
+              </div>
+              <p>11:30 → 13:30 限时午高峰、中段突发阵雨，收工揭晓《算法时间账本》。</p>
+            </button>
+
+            <button
+              type="button"
+              role="radio"
+              aria-checked={mode === 'free'}
+              className="start-mode-card"
+              data-selected={mode === 'free'}
+              onClick={() => setMode('free')}
+            >
+              <div className="start-mode-head">
+                <span className="start-mode-title">
+                  <Compass size={15} aria-hidden="true" />
+                  自由骑行体验
+                </span>
+                <em className="start-mode-tag">无倒计时</em>
+              </div>
+              <p>不限时长慢逛 8×8 微缩中国街区，自由切换晴雨、随时抢单与进楼送餐。</p>
+            </button>
           </div>
-        )}
 
-        <div className="start-modes" role="radiogroup" aria-label="选择游玩模式">
-          <button
-            type="button"
-            role="radio"
-            aria-checked={mode === 'challenge'}
-            className="start-mode-card"
-            data-selected={mode === 'challenge'}
-            onClick={() => setMode('challenge')}
-          >
-            <div className="start-mode-head">
-              <span className="start-mode-title">
-                <Timer size={15} aria-hidden="true" />
-                午高峰 3.5 分钟挑战
-              </span>
-              <em className="start-mode-rec">推荐</em>
-            </div>
-            <p>11:30 → 13:30 限时午高峰、中段突发阵雨，收工揭晓《算法时间账本》。</p>
-          </button>
-
-          <button
-            type="button"
-            role="radio"
-            aria-checked={mode === 'free'}
-            className="start-mode-card"
-            data-selected={mode === 'free'}
-            onClick={() => setMode('free')}
-          >
-            <div className="start-mode-head">
-              <span className="start-mode-title">
-                <Compass size={15} aria-hidden="true" />
-                自由骑行体验
-              </span>
-              <em className="start-mode-tag">无倒计时</em>
-            </div>
-            <p>不限时长慢逛 8×8 微缩中国街区，自由切换晴雨、随时抢单与进楼送餐。</p>
-          </button>
-        </div>
-
-        <div className="start-keys" aria-label="核心操作键位">
-          {KEY_ITEMS.map(({ keys, label }) => (
-            <div key={keys} className="start-key-item">
-              <kbd>{keys}</kbd>
-              <span>{label}</span>
-            </div>
-          ))}
+          <div className="start-keys" aria-label="核心操作键位">
+            {KEY_ITEMS.map(({ keys, label }) => (
+              <div key={keys} className="start-key-item">
+                <kbd>{keys}</kbd>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="start-footer">

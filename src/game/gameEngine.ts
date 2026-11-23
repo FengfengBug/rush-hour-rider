@@ -27,7 +27,7 @@ import { EventSystem, type EventResolution } from './eventSystem'
 import { InteriorScene } from './interiorScene'
 import { WeatherSystem } from './weatherSystem'
 import { AudioEngine } from './audioEngine'
-import type { CityLandmark, CityView, Direction, EngineSnapshot, GameMode, InteriorTheme, NavigationFrameListener, OrderReportReason, RideCameraMode, RiderPreviewMode } from './types'
+import type { CityLandmark, CityView, Direction, EngineSnapshot, GameMode, InteriorTheme, NavigationFrameListener, OrderReportReason, PauseReason, RideCameraMode, RiderPreviewMode } from './types'
 
 const DISTRICT_FOCUS = {
   'food-street': 'shaxian-snacks',
@@ -47,6 +47,15 @@ const DISTRACTION_SAFE_SPEED = 0.8
 const DISTRACTION_FULL_SPEED = 9.0
 const CAMERA_MODES: RideCameraMode[] = ['near', 'far', 'overhead']
 const DRIVING_KEYS = new Set(['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'ShiftLeft', 'ShiftRight'])
+// 自适应画质：仅在持续掉帧时逐级降低渲染倍率，避免核显/高 DPI 屏跌破可玩帧率。
+const RENDER_SCALE_STEPS = [1, 0.85, 0.72] as const
+const QUALITY_LOW_FPS = 48
+const QUALITY_HIGH_FPS = 57
+const QUALITY_LOW_SAMPLES = 2
+const QUALITY_HIGH_SAMPLES = 8
+const QUALITY_DOWNGRADE_COOLDOWN_MS = 2500
+const QUALITY_UPGRADE_COOLDOWN_MS = 7000
+const QUALITY_GRACE_SECONDS = 3
 
 function formatShiftClock(elapsedSeconds: number): string {
   const ratio = Math.max(0, Math.min(1, elapsedSeconds / SHIFT_DURATION_SECONDS))
@@ -107,6 +116,7 @@ export class GameEngine {
   private titleElapsed = 0
   private muted = false
   private paused = false
+  private pauseReason: PauseReason | null = null
   private phoneOpen = false
   private shiftElapsed = 0
   private shiftEnded = false
@@ -127,6 +137,13 @@ export class GameEngine {
   private sampleStartedAt = 0
   private sampleFrames = 0
   private fps = 0
+  private renderScale = 1
+  private contextLost = false
+  private sessionStartedAt = 0
+  private lowFpsStreak = 0
+  private highFpsStreak = 0
+  private lastQualityChangeAt = 0
+  private instanceCount = 0
   private viewportWidth = 1
   private viewportHeight = 1
 
@@ -171,6 +188,8 @@ export class GameEngine {
     this.syncOrderNavigation()
     this.scene.add(this.rider.root, this.dust.root, this.trafficVisuals.root, this.navigationVisuals.root, this.weather.root)
     this.updateRider()
+    this.instanceCount = this.countSceneInstances()
+    this.sessionStartedAt = performance.now()
 
     this.controls = new OrbitControls(this.previewCamera, this.renderer.domElement)
     this.controls.enableDamping = true
@@ -195,6 +214,8 @@ export class GameEngine {
     this.renderer.domElement.addEventListener('pointermove', this.onCanvasPointerMove)
     this.renderer.domElement.addEventListener('wheel', this.onCanvasWheel, { passive: false })
     this.renderer.domElement.addEventListener('dblclick', this.onCanvasDoubleClick)
+    this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost)
+    this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored)
     this.resize()
   }
 
@@ -276,15 +297,21 @@ export class GameEngine {
   }
 
   /** 比赛暂停：冻结班次时钟、车流、订单倒计时与持续音效，但保留 3D 画面渲染。 */
-  setPaused(paused: boolean) {
+  setPaused(paused: boolean, reason: PauseReason = 'manual') {
     if (!this.started || this.shiftEnded || this.paused === paused) return
+    if (!paused && this.contextLost) return
     if (paused) {
-      if (this.interior.mode !== 'none' || this.eventSystem.hasActiveEvent || document.hidden) return
+      if (this.interior.mode === 'photo' || this.eventSystem.hasActiveEvent) return
       this.clearInput()
       this.distractionActive = false
       this.distractionLevel = 0
+      this.pauseReason = reason
+      this.lowFpsStreak = 0
+      this.highFpsStreak = 0
     } else {
       this.previousTime = performance.now()
+      this.pauseReason = null
+      this.audio.unlock()
       this.focusCanvas()
     }
     this.paused = paused
@@ -322,6 +349,7 @@ export class GameEngine {
   returnToTitle() {
     this.clearInput()
     this.paused = false
+    this.pauseReason = null
     this.started = false
     this.titleElapsed = 0
     this.interior.exit()
@@ -335,6 +363,7 @@ export class GameEngine {
     if (!this.started || this.shiftEnded) return
     this.clearInput()
     this.paused = false
+    this.pauseReason = null
     this.distractionActive = false
     this.distractionLevel = 0
     if (this.interior.mode === 'photo') this.interior.closePhotoMode()
@@ -602,6 +631,7 @@ export class GameEngine {
   resetShift() {
     this.clearInput()
     this.paused = false
+    this.pauseReason = null
     this.phoneOpen = false
     this.interior.exit()
     this.weather.reset()
@@ -632,6 +662,7 @@ export class GameEngine {
     this.collisionDisplayTime = 0
     this.shiftElapsed = 0
     this.shiftEnded = false
+    this.sessionStartedAt = performance.now()
     this.distractionLevel = 0
     this.distractionActive = false
     this.distractionPhaseTime = 0
@@ -684,6 +715,9 @@ export class GameEngine {
     this.renderer.domElement.removeEventListener('pointermove', this.onCanvasPointerMove)
     this.renderer.domElement.removeEventListener('wheel', this.onCanvasWheel)
     this.renderer.domElement.removeEventListener('dblclick', this.onCanvasDoubleClick)
+    this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost)
+    this.renderer.domElement.removeEventListener('webglcontextrestored', this.onContextRestored)
+    this.audio.setPageHidden(false)
     this.keys.clear()
     this.controls.dispose()
     this.dust.dispose()
@@ -742,7 +776,13 @@ export class GameEngine {
   }
 
   private readonly onVisibilityChange = () => {
-    if (document.hidden) this.clearInput()
+    const hidden = document.hidden
+    this.audio.setPageHidden(hidden)
+    if (hidden) {
+      this.clearInput()
+      // 切到后台自动暂停计时，回到前台由玩家确认继续，避免“黑屏掉秒”的不公平。
+      if (this.started && !this.shiftEnded && !this.paused) this.setPaused(true, 'hidden')
+    }
     this.previousTime = performance.now()
     this.lastSnapshotTime = 0
   }
@@ -770,9 +810,9 @@ export class GameEngine {
       return
     }
     if (event.code === 'Escape' && !event.repeat) {
-      if (!this.phoneOpen && this.interior.mode === 'none') {
+      if (!this.phoneOpen) {
         event.preventDefault()
-        this.setPaused(true)
+        this.setPaused(true, 'manual')
       }
       return
     }
@@ -846,10 +886,79 @@ export class GameEngine {
     })
   }
 
+  private countSceneInstances(): number {
+    let count = 0
+    this.scene.traverse((object) => {
+      if (object instanceof InstancedMesh) count += object.count
+    })
+    return count
+  }
+
+  /** 按持续掉帧/恢复情况逐级调整渲染倍率，兼顾画质与低端设备可玩性。 */
+  private updateAdaptiveQuality(now: number) {
+    // 用真实墙钟而不是游戏内时钟：极低帧率下游戏 delta 会被钳制，内时钟几乎不前进。
+    if (now - this.sessionStartedAt < QUALITY_GRACE_SECONDS * 1000 || this.fps <= 0) return
+    if (this.fps < QUALITY_LOW_FPS) {
+      this.lowFpsStreak += 1
+      this.highFpsStreak = 0
+    } else if (this.fps > QUALITY_HIGH_FPS) {
+      this.highFpsStreak += 1
+      this.lowFpsStreak = 0
+    } else {
+      this.lowFpsStreak = 0
+      this.highFpsStreak = 0
+    }
+
+    const sinceLastChange = now - this.lastQualityChangeAt
+    const floorScale = RENDER_SCALE_STEPS[RENDER_SCALE_STEPS.length - 1]
+    if (this.lowFpsStreak >= QUALITY_LOW_SAMPLES && sinceLastChange >= QUALITY_DOWNGRADE_COOLDOWN_MS && this.renderScale > floorScale) {
+      const next = RENDER_SCALE_STEPS.find((step) => step < this.renderScale - 0.001) ?? floorScale
+      this.renderScale = next
+      this.lastQualityChangeAt = now
+      this.lowFpsStreak = 0
+      this.highFpsStreak = 0
+      this.applyRenderScale()
+      return
+    }
+
+    if (this.highFpsStreak >= QUALITY_HIGH_SAMPLES && sinceLastChange >= QUALITY_UPGRADE_COOLDOWN_MS && this.renderScale < 1) {
+      const next = RENDER_SCALE_STEPS.find((step) => step > this.renderScale + 0.001) ?? 1
+      this.renderScale = next
+      this.lastQualityChangeAt = now
+      this.lowFpsStreak = 0
+      this.highFpsStreak = 0
+      this.applyRenderScale()
+    }
+  }
+
+  /** 应用当前自适应渲染倍率（实际 DPR 上限仍为 2，避免高分屏过度绘制）。 */
+  private applyRenderScale() {
+    const ratio = Math.min(window.devicePixelRatio, 2) * this.renderScale
+    this.renderer.setPixelRatio(ratio)
+    this.renderer.setSize(this.viewportWidth, this.viewportHeight, false)
+    this.lastSnapshotTime = 0
+  }
+
+  private readonly onContextLost = (event: Event) => {
+    event.preventDefault()
+    if (this.contextLost) return
+    this.contextLost = true
+    this.lastSnapshotTime = 0
+    if (this.started && !this.shiftEnded && !this.paused) this.setPaused(true, 'context-lost')
+  }
+
+  private readonly onContextRestored = () => {
+    this.contextLost = false
+    this.previousTime = performance.now()
+    this.lastSnapshotTime = 0
+    this.applyRenderScale()
+    this.sunlight.shadow.needsUpdate = true
+  }
+
   private readonly resize = () => {
     this.viewportWidth = Math.max(this.container.clientWidth, 1)
     this.viewportHeight = Math.max(this.container.clientHeight, 1)
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * this.renderScale)
     this.renderer.setSize(this.viewportWidth, this.viewportHeight, false)
     this.followCamera.resize(this.viewportWidth, this.viewportHeight)
     this.interior.resize(this.viewportWidth, this.viewportHeight)
@@ -870,7 +979,7 @@ export class GameEngine {
     this.previousTime = time
     const isChallenge = this.gameMode === 'challenge'
     const paused = this.started && this.paused && !this.shiftEnded
-    const shiftActive = this.started && this.view === 'ride' && !document.hidden && !this.shiftEnded && !paused
+    const shiftActive = this.started && this.view === 'ride' && !document.hidden && !this.shiftEnded && !paused && !this.contextLost
     const eventBlocking = this.eventSystem.hasActiveEvent
     const insideBuilding = this.started && this.interior.mode !== 'none'
     if (!this.started) {
@@ -912,6 +1021,7 @@ export class GameEngine {
           this.shiftElapsed = SHIFT_DURATION_SECONDS
           this.shiftEnded = true
           this.paused = false
+          this.pauseReason = null
           if (this.interior.mode === 'photo') this.interior.closePhotoMode()
           this.keys.clear()
           this.lastSnapshotTime = 0
@@ -1068,6 +1178,7 @@ export class GameEngine {
         this.shiftElapsed = SHIFT_DURATION_SECONDS
         this.shiftEnded = true
         this.paused = false
+        this.pauseReason = null
         this.distractionActive = false
         this.distractionLevel = 0
         this.clearInput()
@@ -1114,14 +1225,14 @@ export class GameEngine {
       indoor: insideBuilding,
     })
     if (this.interior.mode !== 'none') {
-      this.renderer.render(this.interior.scene, this.interior.camera)
+      if (!this.contextLost) this.renderer.render(this.interior.scene, this.interior.camera)
     } else {
       if (!shiftActive || eventBlocking) this.updateRider()
       this.navigationVisuals.root.visible = this.started && this.view !== 'rider-rear' && this.view !== 'rider-side'
       this.navigationVisuals.update(paused ? 0 : deltaSeconds, this.controller.state, this.navigation.snapshot, this.started && this.view === 'ride')
       this.navigationFrameListener?.(this.controller.state, this.navigation.snapshot)
       this.world.updateCanopyOcclusion(this.followCamera.camera.position, this.started && this.view === 'ride' ? this.rider.root.position : null, paused ? 0 : deltaSeconds)
-      this.renderer.render(this.scene, this.view === 'ride' ? this.followCamera.camera : this.previewCamera)
+      if (!this.contextLost) this.renderer.render(this.scene, this.view === 'ride' ? this.followCamera.camera : this.previewCamera)
     }
     this.sampleFrames += 1
     const sampleDuration = time - this.sampleStartedAt
@@ -1129,6 +1240,7 @@ export class GameEngine {
       this.fps = Math.round(this.sampleFrames * 1000 / sampleDuration)
       this.sampleFrames = 0
       this.sampleStartedAt = time
+      if (!document.hidden && !this.contextLost && !paused) this.updateAdaptiveQuality(time)
     }
     const eventSnapshot = this.eventSystem.getSnapshot()
     const snapshotInterval =
@@ -1143,8 +1255,6 @@ export class GameEngine {
         ? this.findNearbyEnterable()
         : null
       const nearbyOrder = nearbyEnterable ? this.orders.getOrderForEnterableDelivery(nearbyEnterable.landmark.id) : null
-      let instanceCount = 0
-      this.scene.traverse((object) => { if (object instanceof InstancedMesh && object.visible) instanceCount += object.count })
       this.onSnapshot({
         view: this.view,
         cameraMode: this.cameraMode,
@@ -1159,6 +1269,7 @@ export class GameEngine {
           clockLabel: formatShiftClock(isChallenge ? this.shiftElapsed : this.shiftElapsed % SHIFT_DURATION_SECONDS),
           ended: this.shiftEnded,
           paused: this.paused && this.started && !this.shiftEnded,
+          pauseReason: this.paused && this.started && !this.shiftEnded ? this.pauseReason : null,
         },
         distraction: {
           phoneOpen: this.phoneOpen,
@@ -1198,10 +1309,12 @@ export class GameEngine {
         fps: this.fps,
         drawCalls: this.renderer.info.render.calls,
         triangleCount: this.renderer.info.render.triangles,
-        instanceCount,
+        instanceCount: this.instanceCount,
         viewportWidth: this.viewportWidth,
         viewportHeight: this.viewportHeight,
         pixelRatio: this.renderer.getPixelRatio(),
+        renderScale: this.renderScale,
+        rendererLost: this.contextLost,
       })
       this.lastSnapshotTime = time
     }

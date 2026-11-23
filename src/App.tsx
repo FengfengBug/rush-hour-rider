@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
+import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { GameViewport } from './components/GameViewport'
 import { ScaffoldStatus } from './components/ScaffoldStatus'
 import { RiderPhone } from './components/RiderPhone'
@@ -169,6 +170,21 @@ export default function App() {
         onRestart={resetRider}
         onReturnToTitle={returnToTitle}
       />
+      {snapshot?.rendererLost && (
+        <div className="render-recovery" role="alert">
+          <span className="render-recovery-icon" aria-hidden="true">
+            <AlertTriangle size={18} />
+          </span>
+          <div>
+            <strong>显卡渲染上下文中断</strong>
+            <span>正在尝试自动恢复，计时与派单保持冻结。若长时间无响应，可刷新页面。</span>
+          </div>
+          <button type="button" onClick={() => window.location.reload()}>
+            <RefreshCw size={14} aria-hidden="true" />
+            刷新页面
+          </button>
+        </div>
+      )}
       <StartOverlay visible={!started} initialMode={snapshot?.shift.mode ?? 'challenge'} onStart={startSession} />
     </main>
   )

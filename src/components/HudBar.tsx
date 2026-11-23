@@ -229,8 +229,8 @@ export function HudBar({
           <button
             className="hud-action-btn hud-action-btn--pause"
             type="button"
-            disabled={!snapshot || shift?.ended || shift?.paused || snapshot.interior.mode !== 'none'}
-            title={snapshot?.interior.mode !== 'none' ? '进楼取送时不可暂停' : '暂停游戏（快捷键 Esc）：冻结时钟、车流与倒计时'}
+            disabled={!snapshot || shift?.ended || shift?.paused || snapshot.interior.mode === 'photo'}
+            title={snapshot?.interior.mode === 'photo' ? '拍照送达取景时不可暂停' : '暂停游戏（快捷键 Esc）：冻结时钟、车流与倒计时'}
             aria-label="暂停游戏"
             onClick={(event) => {
               onTogglePause()

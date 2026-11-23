@@ -308,6 +308,8 @@ export interface OrderSnapshot {
 
 export type GameMode = 'challenge' | 'free'
 
+export type PauseReason = 'manual' | 'hidden' | 'context-lost'
+
 export interface ShiftSnapshot {
   started: boolean
   mode: GameMode
@@ -317,6 +319,7 @@ export interface ShiftSnapshot {
   clockLabel: string
   ended: boolean
   paused: boolean
+  pauseReason: PauseReason | null
 }
 
 export interface DistractionSnapshot {
@@ -470,4 +473,7 @@ export interface EngineSnapshot {
   viewportWidth: number
   viewportHeight: number
   pixelRatio: number
+  /** 自适应画质倍率：1 为原生 DPR（上限 2），低于 1 表示已为主机降载。 */
+  renderScale: number
+  rendererLost: boolean
 }

@@ -29,6 +29,7 @@ export class AudioEngine {
   private noiseBuffer: AudioBuffer | null = null
   private muted = false
   private disposed = false
+  private pageHidden = false
   private lastCollisionAt = 0
 
   setMuted(muted: boolean): void {
@@ -48,9 +49,30 @@ export class AudioEngine {
     if (this.disposed) return
     const ctx = this.ensureContext()
     if (!ctx) return
-    if (ctx.state === 'suspended') {
+    if (ctx.state === 'suspended' && !this.pageHidden) {
       void ctx.resume().catch(() => {
         // Ignore autoplay policy rejections until next user gesture.
+      })
+    }
+  }
+
+  /**
+   * 页面切到后台时挂起 AudioContext，避免隐藏标签页里持续播放电机与雨声；
+   * 回到前台后恢复，真正的播放仍由下一次用户手势兜底解锁。
+   */
+  setPageHidden(hidden: boolean): void {
+    this.pageHidden = hidden
+    const ctx = this.ctx
+    if (!ctx || this.disposed) return
+    if (hidden) {
+      if (ctx.state === 'running') {
+        void ctx.suspend().catch(() => {
+          // Ignore suspension failures; audio will fade out with paused state.
+        })
+      }
+    } else if (ctx.state === 'suspended') {
+      void ctx.resume().catch(() => {
+        // Resume is retried on the next user gesture through unlock().
       })
     }
   }
@@ -229,6 +251,7 @@ export class AudioEngine {
     this.rainFilter = null
     this.rainGain = null
     this.noiseBuffer = null
+    this.pageHidden = false
   }
 
   private readyContext(): AudioContext | null {

@@ -247,7 +247,7 @@ export function ScaffoldStatus({
               <span><kbd>H</kbd> 鸣笛（波纹）</span>
               <span><kbd>鼠标移动</kbd> 自由侧头视角（左右 ≤ 270° · 滚轮缩放 · 双击回正）</span>
             </p>
-            <p className="horn-note">鸣笛仅显示波纹，暂无声音。</p>
+            <p className="horn-note">按 <kbd>H</kbd> 鸣笛：车流波纹 + 双音喇叭（静音时仅保留波纹）。</p>
             <p className="desktop-hint">需实体键盘，建议使用电脑体验。</p>
           </div>
 
@@ -320,6 +320,7 @@ export function ScaffoldStatus({
                 <div><dt>实例数</dt><dd>{snapshot?.instanceCount ?? '—'}</dd></div>
                 <div><dt>视口</dt><dd>{snapshot ? `${snapshot.viewportWidth} × ${snapshot.viewportHeight}` : '—'}</dd></div>
                 <div><dt>像素比</dt><dd>{snapshot ? `${snapshot.pixelRatio.toFixed(2)}×` : '—'}</dd></div>
+                <div><dt>画质倍率</dt><dd>{snapshot ? `${Math.round(snapshot.renderScale * 100)}%${snapshot.renderScale < 1 ? ' · 自适应降载' : ''}` : '—'}</dd></div>
               </dl>
             </section>
 
