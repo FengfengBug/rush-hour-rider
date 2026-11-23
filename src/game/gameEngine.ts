@@ -101,6 +101,7 @@ export class GameEngine {
   private navigationElapsed = 0
   private hornRemaining = 0
   private readonly keys = new Set<string>()
+  private touchDrive = { throttle: false, brake: false, steer: 0, boost: false }
   private readonly renderer: WebGLRenderer
   private readonly controls: OrbitControls
   private readonly resizeObserver: ResizeObserver
@@ -131,6 +132,7 @@ export class GameEngine {
   private previewTime = 0
   private wheelAngle = 0
   private collisionDisplayTime = 0
+  private shadowUpdateElapsed = 0
   private frameId: number | null = null
   private previousTime = 0
   private lastSnapshotTime = 0
@@ -331,6 +333,16 @@ export class GameEngine {
     this.followCamera.resetOrbit()
     if (this.paused) this.setPaused(false)
     else this.focusCanvas()
+    this.lastSnapshotTime = 0
+  }
+
+  /** 触屏精简操控：只暴露油门/刹车/转向三个轴，桌面键盘逻辑完全不变。 */
+  setTouchDrive(patch: Partial<{ throttle: boolean; brake: boolean; steer: number; boost: boolean }>) {
+    this.touchDrive = {
+      ...this.touchDrive,
+      ...patch,
+      steer: Math.max(-1, Math.min(1, patch.steer ?? this.touchDrive.steer)),
+    }
     this.lastSnapshotTime = 0
   }
 
@@ -778,6 +790,7 @@ export class GameEngine {
 
   private readonly clearInput = () => {
     this.keys.clear()
+    this.touchDrive = { throttle: false, brake: false, steer: 0, boost: false }
     this.controller.stop()
     this.hornRemaining = 0
     this.trafficVisuals.clearHorn()
@@ -947,6 +960,15 @@ export class GameEngine {
     this.lastSnapshotTime = 0
   }
 
+  /** 阴影贴图按 30Hz 更新：移动中的骑手/车流影子几乎无感延迟，但阴影 pass 开销减半。 */
+  private requestShadowUpdate(deltaSeconds: number) {
+    this.shadowUpdateElapsed += deltaSeconds
+    if (this.shadowUpdateElapsed >= 1 / 30) {
+      this.sunlight.shadow.needsUpdate = true
+      this.shadowUpdateElapsed = 0
+    }
+  }
+
   private readonly onContextLost = (event: Event) => {
     event.preventDefault()
     if (this.contextLost) return
@@ -1002,7 +1024,7 @@ export class GameEngine {
       this.followCamera.updateTitleOrbit(center, this.titleElapsed)
       this.sunlight.target.position.set(center.x, 0, center.z)
       this.sunlight.position.set(center.x - 260, 420, center.z + 240)
-      this.sunlight.shadow.needsUpdate = true
+      this.requestShadowUpdate(deltaSeconds)
     } else if (insideBuilding) {
       this.distractionActive = false
       this.distractionLevel = 0
@@ -1015,8 +1037,10 @@ export class GameEngine {
         this.traffic.update(stepSeconds)
         this.trafficVisuals.update(stepSeconds)
         this.orders.updateInterior(stepSeconds, this.controller.state)
-        const forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'))
-        const strafe = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'))
+        const keyboardForward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'))
+        const keyboardStrafe = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'))
+        const forward = Math.max(-1, Math.min(1, keyboardForward + Number(this.touchDrive.throttle) - Number(this.touchDrive.brake)))
+        const strafe = Math.max(-1, Math.min(1, keyboardStrafe - this.touchDrive.steer))
         this.eventSystem.setLiveTelemetry({
           waitingAtRed: false,
           dt: stepSeconds,
@@ -1065,13 +1089,13 @@ export class GameEngine {
       this.traffic.update(stepSeconds, this.controller.state, this.distractionLevel)
       this.hornRemaining = Math.max(0, this.hornRemaining - stepSeconds)
       this.trafficVisuals.update(stepSeconds)
-      const forward = this.keys.has('KeyW') || this.keys.has('ArrowUp')
+      const forward = this.keys.has('KeyW') || this.keys.has('ArrowUp') || this.touchDrive.throttle
       const reverse = this.keys.has('KeyS') || this.keys.has('ArrowDown')
       this.controller.update(stepSeconds, {
         throttle: Number(forward) - Number(reverse),
-        steering: Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft')) - Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')),
-        brake: this.keys.has('Space') || forward && reverse,
-        boost: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
+        steering: Math.max(-1, Math.min(1, Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft')) - Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) + this.touchDrive.steer)),
+        brake: this.keys.has('Space') || forward && reverse || this.touchDrive.brake,
+        boost: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchDrive.boost,
         distraction: this.distractionLevel,
         distractionTime: this.distractionPhaseTime,
         activeOrderCount: this.orders.activeTargetIds.length,
@@ -1181,7 +1205,7 @@ export class GameEngine {
       )
       this.sunlight.target.position.copy(this.rider.root.position)
       this.sunlight.position.copy(this.sunlight.target.position).add({ x: -240, y: 410, z: 220 })
-      this.sunlight.shadow.needsUpdate = true
+      this.requestShadowUpdate(stepSeconds)
       if (isChallenge && !intercepted && this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
         this.shiftElapsed = SHIFT_DURATION_SECONDS
         this.shiftEnded = true
@@ -1209,7 +1233,7 @@ export class GameEngine {
         this.wheelAngle = (this.wheelAngle + deltaSeconds * 3.2 / RIDER_WHEEL_RADIUS) % (Math.PI * 2)
         const turn = Math.sin(this.previewTime * 1.3)
         this.rider.update({ wheelAngle: this.wheelAngle, steeringAngle: turn * 0.16, leanAngle: -turn * 0.2, braking: false, standLeg: 0 })
-        this.sunlight.shadow.needsUpdate = true
+        this.requestShadowUpdate(deltaSeconds)
       }
       this.controls.update(deltaSeconds)
     }

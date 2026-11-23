@@ -9,6 +9,7 @@ import { DeliveryDeltaToast } from './components/DeliveryDeltaToast'
 import { PauseOverlay } from './components/PauseOverlay'
 import { StartOverlay } from './components/StartOverlay'
 import { ControlsHint } from './components/ControlsHint'
+import { TouchControls } from './components/TouchControls'
 import { SettlementModal } from './components/SettlementModal'
 import type { GameEngine } from './game/gameEngine'
 import type { CityView, EngineSnapshot, GameMode, RideCameraMode, RiderPreviewMode } from './game/types'
@@ -206,6 +207,14 @@ export default function App() {
         />
       )}
       <ControlsHint snapshot={snapshot} />
+      {started && !shiftEnded && (
+        <TouchControls
+          engine={engine}
+          phoneOpen={phoneOpen}
+          visible={started && !shiftEnded}
+          onTogglePhone={() => setPhoneOpen((open) => !open)}
+        />
+      )}
       {started && <EventModal engine={engine} snapshot={snapshot} />}
       {started && <DeliveryCameraOverlay engine={engine} snapshot={snapshot} />}
       {started && !shiftEnded && <DeliveryDeltaToast order={toastOrder} />}

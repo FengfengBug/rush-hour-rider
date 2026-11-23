@@ -355,6 +355,17 @@
   top: 136px;
 }
 
+/* 窄屏 HUD 会折成两行（约 120–150px），事件结果/催单条必须让到 HUD 下方。 */
+@media (max-width: 760px), (max-height: 500px) {
+  .event-outcome-slot {
+    top: 156px;
+  }
+
+  .event-outcome-slot[data-shifted="true"] {
+    top: 212px;
+  }
+}
+
 /* Non-blocking incoming customer call bar */
 .incoming-call-bar {
   display: flex;

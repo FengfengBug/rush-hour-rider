@@ -532,3 +532,11 @@
     animation: none;
   }
 }
+
+/* 触屏设备隐藏键盘键位图与鼠标提示，给触屏操控说明和 CTA 让出首屏空间。 */
+@media (pointer: coarse) {
+  .start-keys,
+  .start-tip {
+    display: none;
+  }
+}

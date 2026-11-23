@@ -1,0 +1,111 @@
+.touch-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 34;
+  display: none;
+  pointer-events: none;
+}
+
+@media (pointer: coarse), (max-width: 760px) {
+  .touch-controls {
+    display: block;
+  }
+}
+
+.touch-pad {
+  position: absolute;
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.touch-pad--steer {
+  left: max(14px, env(safe-area-inset-left));
+  bottom: max(14px, env(safe-area-inset-bottom));
+}
+
+.touch-pad--drive {
+  right: max(14px, env(safe-area-inset-right));
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 168px);
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.touch-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid rgba(255, 248, 226, 0.42);
+  border-radius: 16px;
+  color: #fff8e8;
+  background: rgba(29, 42, 34, 0.58);
+  box-shadow: 0 8px 22px rgba(10, 18, 12, 0.24);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.1;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+.touch-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.touch-btn[data-pressed="true"] {
+  border-color: #ffe7a4;
+  color: #2d2612;
+  background: rgba(243, 195, 68, 0.92);
+  transform: scale(0.96);
+}
+
+.touch-btn--steer {
+  border-radius: 50%;
+}
+
+.touch-btn--throttle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: #2d2612;
+  background: rgba(243, 195, 68, 0.82);
+}
+
+.touch-btn--throttle[data-pressed="true"] {
+  background: #f7cd55;
+}
+
+.touch-btn--brake {
+  width: 56px;
+  height: 50px;
+}
+
+.touch-btn--phone {
+  width: 64px;
+  height: 44px;
+  flex-direction: row;
+  gap: 4px;
+  border-radius: 13px;
+}
+
+@media (max-width: 380px) {
+  .touch-btn--steer {
+    width: 52px;
+    height: 52px;
+  }
+
+  .touch-pad--drive {
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 160px);
+  }
+}

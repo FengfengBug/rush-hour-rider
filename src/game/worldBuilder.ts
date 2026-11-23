@@ -393,9 +393,11 @@ export function buildWorld(layout: CityLayout) {
 
   const tiles = [...new Map(signs.map((entry) => [`${entry.text}|${entry.color}`, entry])).values()]
   const canvas = document.createElement('canvas')
-  const tileWidth = 512
-  const tileHeight = 128
-  const atlasColumns = 4
+  // 256×64 / 8 列：65 块招牌只需 2048×1024，显存约为旧 2048×4096 的 1/4，
+  // 8–25 m 视距下文字仍然清晰；解决低端 GPU / 手机上下文丢失的最大单项显存风险。
+  const tileWidth = 256
+  const tileHeight = 64
+  const atlasColumns = 8
   canvas.width = tileWidth * atlasColumns
   canvas.height = 2 ** Math.ceil(Math.log2(Math.max(1, Math.ceil(tiles.length / atlasColumns)) * tileHeight))
   const context = canvas.getContext('2d')!
@@ -405,10 +407,10 @@ export function buildWorld(layout: CityLayout) {
     context.fillStyle = entry.color
     context.fillRect(x, y, tileWidth, tileHeight)
     context.strokeStyle = '#f2d99d'
-    context.lineWidth = 3
-    context.strokeRect(x + 10, y + 10, tileWidth - 20, tileHeight - 20)
-    context.font = '800 76px "Microsoft YaHei", sans-serif'
-    const fontSize = Math.min(76, 76 * (tileWidth - 56) / context.measureText(entry.text).width)
+    context.lineWidth = 2
+    context.strokeRect(x + 5, y + 5, tileWidth - 10, tileHeight - 10)
+    context.font = '800 38px "Microsoft YaHei", sans-serif'
+    const fontSize = Math.min(38, 38 * (tileWidth - 28) / context.measureText(entry.text).width)
     context.font = `800 ${fontSize}px "Microsoft YaHei", sans-serif`
     context.textAlign = 'center'
     context.textBaseline = 'middle'

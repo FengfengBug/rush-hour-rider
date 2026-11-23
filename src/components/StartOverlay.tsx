@@ -73,8 +73,8 @@ export function StartOverlay({ visible, initialMode = 'challenge', onStart }: St
             <div className="start-compact-hint" role="note">
               <Smartphone size={16} aria-hidden="true" />
               <div>
-                <strong>手机 / 平板体验提示</strong>
-                <p>核心骑行需要实体键盘（WASD / 空格 / Tab，Esc 暂停）。建议使用电脑体验；横屏可看到更完整的街区画面。</p>
+                <strong>手机 / 平板可玩</strong>
+                <p>左下转向、右下加速/刹车，点「手机」抢单。横屏视野更完整，电脑体验最佳。</p>
               </div>
             </div>
           )}

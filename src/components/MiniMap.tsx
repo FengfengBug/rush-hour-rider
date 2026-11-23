@@ -311,6 +311,7 @@ export function MiniMap({ engine, mode = 'local' }: { engine: GameEngine | null;
     let width = -1
     let height = -1
     let ratio = 0
+    let lastDrawAt = 0
 
     const draw = () => {
       if (!active || width <= 0 || height <= 0) return
@@ -340,13 +341,21 @@ export function MiniMap({ engine, mode = 'local' }: { engine: GameEngine | null;
       canvas.width = Math.max(1, Math.round(width * ratio))
       canvas.height = Math.max(1, Math.round(height * ratio))
       draw()
+      lastDrawAt = performance.now()
     }
 
     const onNavigationFrame: NavigationFrameListener = (rider, navigation) => {
       if (!active) return
       frame = { x: rider.x, z: rider.z, heading: rider.heading, navigation }
-      if (ratio !== pixelRatio()) resize()
-      else draw()
+      if (ratio !== pixelRatio()) {
+        resize()
+        return
+      }
+      // 小地图按约 15Hz 重绘：导航数据本身 10Hz 更新，逐帧重绘只会浪费 2D 光栅。
+      const now = performance.now()
+      if (now - lastDrawAt < 70) return
+      lastDrawAt = now
+      draw()
     }
 
     const observer = new ResizeObserver(resize)
