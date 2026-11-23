@@ -28,10 +28,27 @@ export default function App() {
   const [engine, setEngine] = useState<GameEngine | null>(null)
   const [phoneOpen, setPhoneOpen] = useState(false)
   const [muted, setMuted] = useState<boolean>(readMutedPreference)
+  const [devPanelOpen, setDevPanelOpen] = useState<boolean>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('dev') === '1'
+    } catch {
+      return false
+    }
+  })
 
   useEffect(() => {
     engine?.setPhoneOpen(phoneOpen)
   }, [engine, phoneOpen])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'F3' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return
+      event.preventDefault()
+      setDevPanelOpen((open) => !open)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   useEffect(() => {
     engine?.setMuted(muted)
@@ -127,6 +144,8 @@ export default function App() {
         engine={engine}
         snapshot={snapshot}
         muted={muted}
+        devPanelOpen={devPanelOpen}
+        onToggleDevPanel={() => setDevPanelOpen((open) => !open)}
         onNavigationTargetChange={(id) => engine?.setNavigationTarget(id)}
         onViewChange={selectView}
         onRiderPreviewChange={selectRiderPreview}

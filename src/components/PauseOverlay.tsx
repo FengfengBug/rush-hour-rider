@@ -157,6 +157,7 @@ export function PauseOverlay({
         </div>
 
         <p className="pause-footnote" id="pause-footnote">{footnote}</p>
+        <p className="pause-dev-hint">恢复骑行后按 <kbd>F3</kbd> 查看渲染、车流与城市数据技术面板</p>
       </section>
     </div>
   )

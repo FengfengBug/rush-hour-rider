@@ -273,6 +273,24 @@
   text-align: center;
 }
 
+.pause-dev-hint {
+  margin: 6px 0 0;
+  color: #8a907c;
+  font-size: 9.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.pause-dev-hint kbd {
+  padding: 0 4px;
+  border: 1px solid #d2d5c6;
+  border-radius: 4px;
+  background: #f7f4e9;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+}
+
 @keyframes pause-scrim-in {
   from { opacity: 0; }
   to { opacity: 1; }

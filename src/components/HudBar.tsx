@@ -133,6 +133,7 @@ export function HudBar({
             </strong>
           </div>
 
+          {completedCount > 0 && (
           <div
             className="hud-metric hud-metric--ontime"
             data-low={onTimeRate !== null && onTimeRate < 80}
@@ -141,7 +142,9 @@ export function HudBar({
             <span className="hud-label">准时率</span>
             <strong className="hud-value">{onTimeRate !== null ? `${onTimeRate}%` : '—'}</strong>
           </div>
+          )}
 
+          {(completedCount > 0 || reputation < 100) && (
           <div
             className="hud-metric hud-metric--reputation"
             data-low={reputation < 80}
@@ -150,6 +153,7 @@ export function HudBar({
             <span className="hud-label">信誉</span>
             <strong className="hud-value">{reputation}%</strong>
           </div>
+          )}
 
           <div
             className="hud-meter"

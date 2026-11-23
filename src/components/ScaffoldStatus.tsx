@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Sun } from 'lucide-react'
+import { X } from 'lucide-react'
 import { CITY_LAYOUT } from '../game/cityLayout'
 import { NAVIGATION_COLORS } from '../game/navigationSystem'
 import { HudBar } from './HudBar'
@@ -48,6 +48,8 @@ interface ScaffoldStatusProps {
   engine: GameEngine | null
   snapshot: EngineSnapshot | null
   muted: boolean
+  devPanelOpen: boolean
+  onToggleDevPanel: () => void
   onNavigationTargetChange: (id: string | null) => void
   onViewChange: (view: CityView) => void
   onRiderPreviewChange: (mode: RiderPreviewMode) => void
@@ -62,7 +64,7 @@ interface ScaffoldStatusProps {
 }
 
 export function ScaffoldStatus({
-  engine, snapshot, muted, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onCycleCamera, onToggleWeather, onToggleMute, onResetRider, onFinishShift, onReturnToTitle, onTogglePause,
+  engine, snapshot, muted, devPanelOpen, onToggleDevPanel, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onCycleCamera, onToggleWeather, onToggleMute, onResetRider, onFinishShift, onReturnToTitle, onTogglePause,
 }: ScaffoldStatusProps) {
   const [mapMode, setMapMode] = useState<MiniMapMode>('local')
   const view = snapshot?.view ?? 'ride'
@@ -90,7 +92,7 @@ export function ScaffoldStatus({
   if (!snapshot?.shift.started || interiorMode === 'photo') return null
 
   return (
-    <div className="scene-overlay">
+    <div className="scene-overlay" data-dev={devPanelOpen}>
       <HudBar
         snapshot={snapshot}
         muted={muted}
@@ -104,44 +106,52 @@ export function ScaffoldStatus({
 
       {isInside ? <div /> : (
       <div className="scene-controls">
-        <section className="navigation-panel" aria-label="订单导航" style={{ borderTopColor: selectedTarget ? NAVIGATION_COLORS[selectedTarget.kind] : undefined }}>
+        <section className="navigation-panel navigation-panel--compact" aria-label="订单导航" style={{ borderTopColor: selectedTarget ? NAVIGATION_COLORS[selectedTarget.kind] : undefined }}>
           <header className="navigation-heading">
-            <h2>街区导航</h2>
+            <h2>导航</h2>
             {isRiding ? (
               <button
                 className="map-mode-toggle"
                 type="button"
                 aria-pressed={mapMode === 'full'}
-                title="切换局部雷达跟随 / 全城 8×8 俯瞰"
+                title="切换局部跟随 / 全城 8×8 俯瞰"
                 onClick={() => setMapMode((current) => current === 'local' ? 'full' : 'local')}
               >
-                {mapMode === 'local' ? '局部跟随' : '全城 8×8'}
+                {mapMode === 'local' ? '局部' : '全城'}
               </button>
             ) : (
               <button className="return-ride" type="button" data-view="ride" onClick={() => onViewChange('ride')}>返回骑行</button>
             )}
           </header>
           <MiniMap engine={engine} mode={mapMode} />
-          <div className="navigation-legend" aria-label="地图图例">
-            {navigationKinds.map(({ kind, label }) => <span key={kind}><i data-kind={kind} style={{ backgroundColor: NAVIGATION_COLORS[kind] }} />{label}</span>)}
-          </div>
-          <label className="navigation-select-label" htmlFor="navigation-target">优先导航地点</label>
-          <select id="navigation-target" className="navigation-select" aria-label="优先导航地点" value={navigation?.targetId ?? ''} disabled={!navigation} onChange={(event) => onNavigationTargetChange(event.target.value || null)}>
-            <option value="">不设置优先目标</option>
-            {navigationKinds.map(({ kind, label }) => (
-              <optgroup key={kind} label={`${label}地点`}>
-                {navigation?.targets.filter((target) => target.kind === kind).map((target) => <option key={target.id} value={target.id}>{label} · {target.name}</option>)}
-              </optgroup>
-            ))}
-          </select>
           <div className="navigation-readout" data-arrived={navigation?.arrived ?? false}>
-            <strong>{!navigation ? '连接中' : !selectedTarget ? '未选目标' : navigation.arrived ? '已到达目标点' : `${Math.ceil(navigation.distance)} m`}</strong>
-            <span>{selectedTarget ? navigation?.arrived ? `${selectedTarget.radius}m 范围内` : '沿路距离' : `${navigation?.targets.length ?? 0} 个地点`}</span>
+            <strong>{!navigation ? '连接中' : !selectedTarget ? '未选目标' : navigation.arrived ? '已到达' : `${Math.ceil(navigation.distance)} m`}</strong>
+            <span>{selectedTarget ? selectedTarget.name : `${navigation?.targets.length ?? 0} 个地点`}</span>
           </div>
-          <p className="navigation-note">{!isRiding ? '检查中 · 配送与交通暂停' : snapshot?.orders.active.length ? `${snapshot.orders.active.length} 单在途 · 光圈内自动取送` : '接单后显取送点 · 换电仅导航'}</p>
+          <details className="navigation-more">
+            <summary>优先目标</summary>
+            <select id="navigation-target" className="navigation-select" aria-label="优先导航地点" value={navigation?.targetId ?? ''} disabled={!navigation} onChange={(event) => onNavigationTargetChange(event.target.value || null)}>
+              <option value="">不设置优先目标</option>
+              {navigationKinds.map(({ kind, label }) => (
+                <optgroup key={kind} label={`${label}地点`}>
+                  {navigation?.targets.filter((target) => target.kind === kind).map((target) => <option key={target.id} value={target.id}>{label} · {target.name}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </details>
         </section>
 
-        <aside className="inspection-stack" aria-label="驾驶数据与城市检查">
+        {devPanelOpen && (
+        <aside className="inspection-stack inspection-stack--dev" aria-label="技术面板">
+        <header className="dev-panel-head">
+          <div>
+            <strong>技术面板</strong>
+            <span>F3 开关 · 渲染、车流与城市数据</span>
+          </div>
+          <button type="button" onClick={onToggleDevPanel} aria-label="关闭技术面板（F3）">
+            <X size={15} aria-hidden="true" />
+          </button>
+        </header>
         <details className="drive-inspector">
           <summary>驾驶与交通 <small>{speed} km/h · {rider ? `${rider.battery.toFixed(0)}%` : '—'}</small></summary>
         <section className="ride-card" aria-label="实时驾驶数据与操作">
@@ -356,19 +366,9 @@ export function ScaffoldStatus({
           </div>
         </details>
         </aside>
+        )}
       </div>
       )}
-
-      <footer className="scene-footer">
-        <div className="scene-caption">
-          <h2><Sun size={14} aria-hidden="true" />看清方向，再出发。</h2>
-          <p>鼠标悬停移动自由观察（左右 ≤ 270°）· 滚轮缩放 · 双击/C 键回正</p>
-        </div>
-        <div className="engine-summary">
-          <span className="engine-state" data-ready={snapshot !== null}>{snapshot ? '引擎运行中' : '正在初始化'}</span>
-          <span>{fps}</span>
-        </div>
-      </footer>
     </div>
   )
 }

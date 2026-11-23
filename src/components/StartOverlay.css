@@ -507,6 +507,26 @@
   }
 }
 
+/* 桌面首屏 hero-lite：卡片靠左，右侧留给实时 3D 街区，避免把最强画面压成壁纸。 */
+@media (min-width: 900px) {
+  .start-overlay {
+    place-items: center start;
+    padding-left: clamp(36px, 7vw, 112px);
+    padding-right: 40px;
+  }
+
+  .start-scrim {
+    background:
+      linear-gradient(96deg, rgba(14, 22, 17, 0.62) 0%, rgba(14, 22, 17, 0.4) 36%, rgba(14, 22, 17, 0.1) 64%, rgba(14, 22, 17, 0) 84%),
+      radial-gradient(circle at 74% 48%, rgba(23, 33, 25, 0.04) 0%, rgba(20, 29, 23, 0.16) 100%);
+  }
+
+  .start-card {
+    width: min(520px, 48vw);
+    max-height: calc(100dvh - 56px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .start-card {
     animation: none;

@@ -591,6 +591,11 @@
     font-size: 13px;
   }
 
+  /* 窄屏 HUD 只保留时钟、收入、电量与体力；完成单数在手机与暂停卡内仍可查看。 */
+  .hud-metric--orders {
+    display: none;
+  }
+
   .hud-active-pill {
     display: none;
   }

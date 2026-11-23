@@ -66,7 +66,7 @@ export function StartOverlay({ visible, initialMode = 'challenge', onStart }: St
           </header>
 
           <p className="start-quote">
-            在算法划定的每一秒里，穿过红灯、电梯、物业门禁与午后阵雨，看见城市运转背后真实的时间成本。
+            算法算得出距离，算不出红灯、电梯与一场阵雨。
           </p>
 
           {compactExperience && (
@@ -137,7 +137,7 @@ export function StartOverlay({ visible, initialMode = 'challenge', onStart }: St
             <span>上线接单</span>
             <kbd>Enter</kbd>
           </button>
-          <p className="start-tip">无需登录 · 按 Esc 可随时暂停 · 鼠标悬停移动可自由环顾视角（左右 270°），滚轮缩放</p>
+          <p className="start-tip">无需登录 · Esc 暂停 · F3 技术数据 · 鼠标悬停环顾视角（左右 270°），滚轮缩放</p>
         </div>
       </section>
     </div>
