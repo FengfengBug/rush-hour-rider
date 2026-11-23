@@ -342,6 +342,17 @@
   background: #d0e8f4;
 }
 
+.hud-bar .hud-action-btn--finish {
+  border-color: #d7b25a;
+  color: #5c3e08;
+  background: #fdf2cf;
+}
+
+.hud-bar .hud-action-btn--finish:hover:not(:disabled) {
+  border-color: #bc8c22;
+  background: #fde49b;
+}
+
 .hud-bar .hud-action-btn:focus-visible {
   outline: 2px solid #2b6451;
   outline-offset: 2px;

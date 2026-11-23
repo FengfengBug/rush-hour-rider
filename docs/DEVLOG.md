@@ -247,3 +247,15 @@
 ![Task 4.1 开局沉浸式动态 3D 街区主界面与双模式卡片实机](screenshots/2026-11-23-task-41-01.png)
 
 ![Task 4.1 开局底部 3 步动态新手引导条实机](screenshots/2026-11-23-task-41-02.png)
+
+## 2026-11-23 · Task 4.2：《算法时间账本》与“多给 5 分钟”反事实推演面板
+- **完成内容**：
+  - 新增纯 TypeScript 账本聚合与反事实推演模块 `src/game/counterfactual.ts`：`buildShiftSummary()` 真实汇总全班次完成单数、准时率、毛收入、扣款/运营支出、实得净收入、信誉安全记录与非骑行时间占比并颁发客观骑手称号；`evaluateCounterfactual()` 支持 `+0 → +8` 分钟缓冲滑块，基于本局每单真实超时秒数与闯红灯记录动态重算准时率跃升、可免闯红灯冒险与多保住的净收入（0 单/空局/自由模式零 `NaN` 零除零）。
+  - 新增收工结算大屏 `src/components/SettlementModal.tsx` 与 `SettlementModal.css`：展示骑手称号卡、净到手主卡、4 格核心 KPI、「平台理想预估 vs 现实实际耗时」6 段横向堆叠柱状图，以及 `+0/+3/+5/+8 分钟` 快捷档位与滑动反事实对比面板。
+  - 在 `src/game/gameEngine.ts`、`src/components/HudBar.tsx` 与 `src/App.tsx` 接入顶栏「收工」提前结算入口、自由模式/中途结算的「继续当前局」恢复与「再来一局」重置，并修复了 `RiderPhone` 与 `SettlementModal` 同级 React `key` 冲突。
+- **验收结果**：`npm run build` 零错误通过（生产包约 `1,080.09 KB` / gzip `301.35 KB`）；Node 反事实校验全通；实机 5 单真实午高峰跑局完整呈现「雨中逆行者 · 平台理想 234.0s vs 现实实际 521.1s（卡餐 64.0s / 进楼门禁 50.3s / 绕路 39.0s）」及拖动缓冲滑块实时对比，浏览器复验 159 FPS、控制台 0 报错。
+- **截图归档**：
+
+![Task 4.2 实机 5 单午高峰《算法时间账本》原算法基线画面](screenshots/2026-11-23-task-42-01.png)
+
+![Task 4.2 拖动缓冲滑块实时反事实推演对比画面](screenshots/2026-11-23-task-42-02.png)

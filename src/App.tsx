@@ -6,6 +6,7 @@ import { EventModal } from './components/EventModal'
 import { DeliveryCameraOverlay } from './components/DeliveryCameraOverlay'
 import { StartOverlay } from './components/StartOverlay'
 import { ControlsHint } from './components/ControlsHint'
+import { SettlementModal } from './components/SettlementModal'
 import type { GameEngine } from './game/gameEngine'
 import type { CityView, EngineSnapshot, GameMode, RideCameraMode, RiderPreviewMode } from './game/types'
 import './App.css'
@@ -78,7 +79,21 @@ export default function App() {
     engine?.returnToTitle()
   }
 
+  function finishShiftEarly() {
+    setPhoneOpen(false)
+    engine?.finishShiftEarly()
+  }
+
+  function resumeShift() {
+    engine?.resumeShiftFromSettlement()
+  }
+
   const started = snapshot?.shift.started ?? false
+  const shiftEnded = snapshot?.shift.ended ?? false
+  const canResumeSettlement = !!snapshot && (
+    snapshot.shift.mode === 'free'
+    || snapshot.shift.remainingSec > 0.05
+  )
   const distractionLevel = snapshot?.distraction.level ?? 0
   const distractionActive = snapshot?.distraction.active ?? false
   const distractionStyle = {
@@ -106,11 +121,12 @@ export default function App() {
         onToggleWeather={toggleWeather}
         onToggleMute={toggleMute}
         onResetRider={resetRider}
+        onFinishShift={finishShiftEarly}
         onReturnToTitle={returnToTitle}
       />
       {started && (
         <RiderPhone
-          key={snapshot?.orders.shiftId ?? 0}
+          key={`phone-${snapshot?.orders.shiftId ?? 0}`}
           engine={engine}
           snapshot={snapshot}
           open={phoneOpen}
@@ -120,6 +136,15 @@ export default function App() {
       <ControlsHint snapshot={snapshot} />
       {started && <EventModal engine={engine} snapshot={snapshot} />}
       {started && <DeliveryCameraOverlay engine={engine} snapshot={snapshot} />}
+      <SettlementModal
+        key={`settlement-${snapshot?.orders.shiftId ?? 0}`}
+        visible={started && shiftEnded}
+        snapshot={snapshot}
+        canResume={canResumeSettlement}
+        onResume={resumeShift}
+        onRestart={resetRider}
+        onReturnToTitle={returnToTitle}
+      />
       <StartOverlay visible={!started} initialMode={snapshot?.shift.mode ?? 'challenge'} onStart={startSession} />
     </main>
   )

@@ -56,11 +56,12 @@ interface ScaffoldStatusProps {
   onToggleWeather: () => void
   onToggleMute: () => void
   onResetRider: () => void
+  onFinishShift: () => void
   onReturnToTitle: () => void
 }
 
 export function ScaffoldStatus({
-  engine, snapshot, muted, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onCycleCamera, onToggleWeather, onToggleMute, onResetRider, onReturnToTitle,
+  engine, snapshot, muted, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onCycleCamera, onToggleWeather, onToggleMute, onResetRider, onFinishShift, onReturnToTitle,
 }: ScaffoldStatusProps) {
   const [mapMode, setMapMode] = useState<MiniMapMode>('local')
   const view = snapshot?.view ?? 'ride'
@@ -95,7 +96,7 @@ export function ScaffoldStatus({
         onCycleCamera={onCycleCamera}
         onToggleWeather={onToggleWeather}
         onToggleMute={onToggleMute}
-        onResetRider={onResetRider}
+        onFinishShift={onFinishShift}
         onReturnToTitle={onReturnToTitle}
       />
 

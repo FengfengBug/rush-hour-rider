@@ -301,6 +301,24 @@ export class GameEngine {
     this.lastSnapshotTime = 0
   }
 
+  finishShiftEarly() {
+    if (!this.started || this.shiftEnded) return
+    this.clearInput()
+    this.distractionActive = false
+    this.distractionLevel = 0
+    if (this.interior.mode === 'photo') this.interior.closePhotoMode()
+    this.shiftEnded = true
+    this.lastSnapshotTime = 0
+  }
+
+  resumeShiftFromSettlement() {
+    if (!this.started || !this.shiftEnded) return
+    if (this.gameMode === 'challenge' && this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) return
+    this.shiftEnded = false
+    this.lastSnapshotTime = 0
+    this.focusCanvas()
+  }
+
   setPhoneOpen(open: boolean) {
     if (this.phoneOpen === open) return
     this.phoneOpen = open

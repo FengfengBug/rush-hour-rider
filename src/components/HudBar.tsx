@@ -7,7 +7,6 @@ import {
   Eye,
   Flag,
   HeartPulse,
-  RotateCcw,
   Sun,
   Volume2,
   VolumeX,
@@ -22,7 +21,7 @@ interface HudBarProps {
   onCycleCamera: () => void
   onToggleWeather: () => void
   onToggleMute: () => void
-  onResetRider: () => void
+  onFinishShift: () => void
   onReturnToTitle: () => void
 }
 
@@ -47,14 +46,13 @@ export function HudBar({
   onCycleCamera,
   onToggleWeather,
   onToggleMute,
-  onResetRider,
+  onFinishShift,
   onReturnToTitle,
 }: HudBarProps) {
   const shift = snapshot?.shift
   const rider = snapshot?.rider
   const orders = snapshot?.orders
   const distraction = snapshot?.distraction
-  const traffic = snapshot?.traffic
   const weather = snapshot?.weather
   const cameraMode = snapshot?.cameraMode ?? 'near'
   const raining = weather?.raining ?? false
@@ -224,6 +222,21 @@ export function HudBar({
             {muted ? <VolumeX size={14} aria-hidden="true" /> : <Volume2 size={14} aria-hidden="true" />}
             <span>{muted ? '静音' : '音效'}</span>
           </button>
+
+          <button
+            className="hud-action-btn hud-action-btn--finish"
+            type="button"
+            disabled={!snapshot || shift?.ended}
+            title="提前收工并查看《算法时间账本》与反事实推演"
+            aria-label="提前收工结算"
+            onClick={(event) => {
+              onFinishShift()
+              if (event.detail > 0) (event.currentTarget as HTMLButtonElement).blur()
+            }}
+          >
+            <Flag size={14} aria-hidden="true" />
+            <span>收工</span>
+          </button>
         </div>
       </header>
 
@@ -237,27 +250,6 @@ export function HudBar({
               <strong>边骑边看手机，注意前方路况！</strong>
               <span>转向变迟钝 · 碰撞风险升高 · 减速停车或按 <kbd>Tab</kbd> 收起</span>
             </div>
-          </div>
-        </div>
-      )}
-
-      {shift?.ended && (
-        <div className="hud-alert-slot">
-          <div className="shift-ended-banner" role="status" aria-live="polite">
-            <span className="shift-ended-icon" aria-hidden="true">
-              <Flag size={18} />
-            </span>
-            <div className="shift-ended-copy">
-              <strong>13:30 午高峰班次结束</strong>
-              <span>
-                完成 {completedCount} 单 · 准时率 {onTimeRate !== null ? `${onTimeRate}%` : '—'} · 实得 {orders ? formatMoney(orders.incomeCents) : '¥0.00'}
-                {traffic ? ` · 闯红灯 ${traffic.redLightCount} 次 · 碰撞 ${traffic.collisionCount} 次` : ''}
-              </span>
-            </div>
-            <button className="shift-ended-restart" type="button" onClick={onResetRider}>
-              <RotateCcw size={14} aria-hidden="true" />
-              重新开工
-            </button>
           </div>
         </div>
       )}
