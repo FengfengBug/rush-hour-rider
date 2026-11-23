@@ -568,16 +568,35 @@ export class GameEngine {
     listener?.(this.controller.state, this.navigation.snapshot)
   }
 
-  resetRider() {
+  resetShift() {
+    this.clearInput()
+    this.phoneOpen = false
     this.interior.exit()
     this.weather.reset()
+    this.weather.applyAtmosphere(
+      this.scene,
+      this.sunlight,
+      this.hemiLight,
+      (intensity) => this.world.setStreetLampGlow(intensity),
+      true,
+    )
     this.controller.reset()
     this.orders.reset()
+    this.orders.setRaining(false)
     this.eventSystem.reset()
     this.navigation.reset()
     this.syncOrderNavigation()
     this.traffic.reset()
+    this.trafficVisuals.clearHorn()
     this.trafficVisuals.update(0)
+    this.dust.clear()
+    this.audio.updateContinuous({
+      speedAbs: 0,
+      boosting: false,
+      rainIntensity: 0,
+      active: false,
+      indoor: false,
+    })
     this.collisionDisplayTime = 0
     this.shiftElapsed = 0
     this.shiftEnded = false
@@ -593,6 +612,10 @@ export class GameEngine {
     this.lastKnownPickedUpCount = 0
     this.setCityView('ride')
     this.lastSnapshotTime = 0
+  }
+
+  resetRider() {
+    this.resetShift()
   }
 
   setRiderPreviewMode(mode: RiderPreviewMode) {

@@ -495,10 +495,29 @@
   padding-top: 4px;
 }
 
-.settlement-footer-left {
+.settlement-footer-left,
+.settlement-footer-right {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.settlement-btn--poster {
+  border: 1.5px solid #49876d;
+  color: #1f4d3b;
+  background: #e9f6ef;
+}
+
+.settlement-btn--poster:hover {
+  border-color: #357058;
+  background: #d8efe3;
+}
+
+.settlement-btn--poster[data-exported="true"] {
+  border-color: #2f7d4d;
+  color: #fff;
+  background: #2f7d4d;
 }
 
 .settlement-btn {

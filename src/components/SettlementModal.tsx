@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import {
   ArrowRight,
   Award,
+  Check,
   Clock,
+  Download,
   Flag,
   Home,
   RotateCcw,
@@ -16,6 +18,7 @@ import {
   SIM_SECONDS_PER_REAL_MINUTE,
 } from '../game/counterfactual'
 import type { EngineSnapshot, OrderTimeLedger } from '../game/types'
+import { downloadSharePosterPng } from './sharePoster'
 import './SettlementModal.css'
 
 interface SettlementModalProps {
@@ -55,6 +58,7 @@ export function SettlementModal({
   onReturnToTitle,
 }: SettlementModalProps) {
   const [extraMinutes, setExtraMinutes] = useState<number>(0)
+  const [exportedLabel, setExportedLabel] = useState<string | null>(null)
 
   const summary = useMemo(
     () => (snapshot ? buildShiftSummary(snapshot) : null),
@@ -66,6 +70,13 @@ export function SettlementModal({
   )
 
   if (!visible || !snapshot || !summary || !cf) return null
+
+  function handleDownloadPoster() {
+    if (!snapshot) return
+    const filename = downloadSharePosterPng(snapshot, extraMinutes)
+    setExportedLabel(`已导出 ${filename}`)
+    window.setTimeout(() => setExportedLabel(null), 3200)
+  }
 
   const maxBarSec = Math.max(1, summary.idealTotalSec, summary.actualTotalSec)
   const idealBarPct = Math.min(100, (summary.idealTotalSec / maxBarSec) * 100)
@@ -320,10 +331,22 @@ export function SettlementModal({
               </button>
             )}
           </div>
-          <button type="button" className="settlement-btn settlement-btn--primary" onClick={onRestart}>
-            <RotateCcw size={15} aria-hidden="true" />
-            再来一局
-          </button>
+          <div className="settlement-footer-right">
+            <button
+              type="button"
+              className="settlement-btn settlement-btn--poster"
+              data-exported={exportedLabel !== null}
+              onClick={handleDownloadPoster}
+              title="使用本机纯 Canvas 2D 生成 900×1200 高清骑手账单海报 PNG"
+            >
+              {exportedLabel ? <Check size={15} aria-hidden="true" /> : <Download size={15} aria-hidden="true" />}
+              {exportedLabel ? '已保存战报 PNG' : '下载今日骑手账单海报'}
+            </button>
+            <button type="button" className="settlement-btn settlement-btn--primary" onClick={onRestart}>
+              <RotateCcw size={15} aria-hidden="true" />
+              再来一局
+            </button>
+          </div>
         </footer>
       </article>
     </div>
