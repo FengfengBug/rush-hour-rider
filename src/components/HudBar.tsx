@@ -7,6 +7,7 @@ import {
   Eye,
   Flag,
   HeartPulse,
+  Pause,
   Sun,
   Volume2,
   VolumeX,
@@ -23,6 +24,7 @@ interface HudBarProps {
   onToggleMute: () => void
   onFinishShift: () => void
   onReturnToTitle: () => void
+  onTogglePause: () => void
 }
 
 const CAMERA_LABELS: Record<RideCameraMode, string> = {
@@ -48,6 +50,7 @@ export function HudBar({
   onToggleMute,
   onFinishShift,
   onReturnToTitle,
+  onTogglePause,
 }: HudBarProps) {
   const shift = snapshot?.shift
   const rider = snapshot?.rider
@@ -221,6 +224,21 @@ export function HudBar({
           >
             {muted ? <VolumeX size={14} aria-hidden="true" /> : <Volume2 size={14} aria-hidden="true" />}
             <span>{muted ? '静音' : '音效'}</span>
+          </button>
+
+          <button
+            className="hud-action-btn hud-action-btn--pause"
+            type="button"
+            disabled={!snapshot || shift?.ended || shift?.paused || snapshot.interior.mode !== 'none'}
+            title={snapshot?.interior.mode !== 'none' ? '进楼取送时不可暂停' : '暂停游戏（快捷键 Esc）：冻结时钟、车流与倒计时'}
+            aria-label="暂停游戏"
+            onClick={(event) => {
+              onTogglePause()
+              if (event.detail > 0) (event.currentTarget as HTMLButtonElement).blur()
+            }}
+          >
+            <Pause size={14} aria-hidden="true" />
+            <span>暂停</span>
           </button>
 
           <button

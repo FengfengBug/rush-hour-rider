@@ -58,10 +58,11 @@ interface ScaffoldStatusProps {
   onResetRider: () => void
   onFinishShift: () => void
   onReturnToTitle: () => void
+  onTogglePause: () => void
 }
 
 export function ScaffoldStatus({
-  engine, snapshot, muted, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onCycleCamera, onToggleWeather, onToggleMute, onResetRider, onFinishShift, onReturnToTitle,
+  engine, snapshot, muted, onNavigationTargetChange, onViewChange, onRiderPreviewChange, onCameraChange, onCycleCamera, onToggleWeather, onToggleMute, onResetRider, onFinishShift, onReturnToTitle, onTogglePause,
 }: ScaffoldStatusProps) {
   const [mapMode, setMapMode] = useState<MiniMapMode>('local')
   const view = snapshot?.view ?? 'ride'
@@ -98,6 +99,7 @@ export function ScaffoldStatus({
         onToggleMute={onToggleMute}
         onFinishShift={onFinishShift}
         onReturnToTitle={onReturnToTitle}
+        onTogglePause={onTogglePause}
       />
 
       {isInside ? <div /> : (
@@ -241,6 +243,7 @@ export function ScaffoldStatus({
               <span><kbd>Shift</kbd> 耗电助推</span>
               <span><kbd>Tab</kbd> 收放手机</span>
               <span><kbd>C</kbd> 切镜头</span>
+              <span><kbd>Esc</kbd> 暂停</span>
               <span><kbd>H</kbd> 鸣笛（波纹）</span>
               <span><kbd>鼠标移动</kbd> 自由侧头视角（左右 ≤ 270° · 滚轮缩放 · 双击回正）</span>
             </p>

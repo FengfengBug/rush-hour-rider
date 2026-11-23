@@ -106,6 +106,7 @@ export class GameEngine {
   private gameMode: GameMode = 'challenge'
   private titleElapsed = 0
   private muted = false
+  private paused = false
   private phoneOpen = false
   private shiftElapsed = 0
   private shiftEnded = false
@@ -274,6 +275,34 @@ export class GameEngine {
     this.lastSnapshotTime = 0
   }
 
+  /** 比赛暂停：冻结班次时钟、车流、订单倒计时与持续音效，但保留 3D 画面渲染。 */
+  setPaused(paused: boolean) {
+    if (!this.started || this.shiftEnded || this.paused === paused) return
+    if (paused) {
+      if (this.interior.mode !== 'none' || this.eventSystem.hasActiveEvent || document.hidden) return
+      this.clearInput()
+      this.distractionActive = false
+      this.distractionLevel = 0
+    } else {
+      this.previousTime = performance.now()
+      this.focusCanvas()
+    }
+    this.paused = paused
+    this.lastSnapshotTime = 0
+  }
+
+  togglePause() {
+    this.setPaused(!this.paused)
+  }
+
+  /** 暂停菜单中的「重置视角」：回正第三人称镜头并回到骑行。 */
+  resetView() {
+    this.followCamera.resetOrbit()
+    if (this.paused) this.setPaused(false)
+    else this.focusCanvas()
+    this.lastSnapshotTime = 0
+  }
+
   toggleWeather() {
     this.weather.toggleManualWeather()
     this.lastSnapshotTime = 0
@@ -292,6 +321,7 @@ export class GameEngine {
 
   returnToTitle() {
     this.clearInput()
+    this.paused = false
     this.started = false
     this.titleElapsed = 0
     this.interior.exit()
@@ -304,6 +334,7 @@ export class GameEngine {
   finishShiftEarly() {
     if (!this.started || this.shiftEnded) return
     this.clearInput()
+    this.paused = false
     this.distractionActive = false
     this.distractionLevel = 0
     if (this.interior.mode === 'photo') this.interior.closePhotoMode()
@@ -570,6 +601,7 @@ export class GameEngine {
 
   resetShift() {
     this.clearInput()
+    this.paused = false
     this.phoneOpen = false
     this.interior.exit()
     this.weather.reset()
@@ -671,7 +703,7 @@ export class GameEngine {
   }
 
   readonly focusCanvas = () => {
-    this.audio.unlock()
+    // 不在无用户手势时创建 AudioContext，避免自动播放策略在首屏控制台留下告警。
     this.renderer.domElement.focus({ preventScroll: true })
   }
 
@@ -719,6 +751,13 @@ export class GameEngine {
     this.audio.unlock()
     if (!this.started || this.shiftEnded) return
     if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (this.paused) {
+      if (event.code === 'Escape') {
+        event.preventDefault()
+        if (!event.repeat) this.setPaused(false)
+      }
+      return
+    }
     if (this.eventSystem.hasActiveEvent) return
     if (this.interior.mode === 'photo') {
       if (event.code === 'Space' || event.code === 'Enter') {
@@ -727,6 +766,13 @@ export class GameEngine {
       } else if (event.code === 'Escape') {
         event.preventDefault()
         if (!event.repeat) this.closeDeliveryCamera()
+      }
+      return
+    }
+    if (event.code === 'Escape' && !event.repeat) {
+      if (!this.phoneOpen && this.interior.mode === 'none') {
+        event.preventDefault()
+        this.setPaused(true)
       }
       return
     }
@@ -823,7 +869,8 @@ export class GameEngine {
     const deltaSeconds = Math.max(0, Math.min((time - this.previousTime) / 1000, 0.05))
     this.previousTime = time
     const isChallenge = this.gameMode === 'challenge'
-    const shiftActive = this.started && this.view === 'ride' && !document.hidden && !this.shiftEnded
+    const paused = this.started && this.paused && !this.shiftEnded
+    const shiftActive = this.started && this.view === 'ride' && !document.hidden && !this.shiftEnded && !paused
     const eventBlocking = this.eventSystem.hasActiveEvent
     const insideBuilding = this.started && this.interior.mode !== 'none'
     if (!this.started) {
@@ -864,6 +911,7 @@ export class GameEngine {
         if (isChallenge && this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
           this.shiftElapsed = SHIFT_DURATION_SECONDS
           this.shiftEnded = true
+          this.paused = false
           if (this.interior.mode === 'photo') this.interior.closePhotoMode()
           this.keys.clear()
           this.lastSnapshotTime = 0
@@ -1019,6 +1067,7 @@ export class GameEngine {
       if (isChallenge && !intercepted && this.shiftElapsed >= SHIFT_DURATION_SECONDS - 0.000001) {
         this.shiftElapsed = SHIFT_DURATION_SECONDS
         this.shiftEnded = true
+        this.paused = false
         this.distractionActive = false
         this.distractionLevel = 0
         this.clearInput()
@@ -1028,11 +1077,11 @@ export class GameEngine {
     } else if (this.view === 'ride') {
       this.distractionActive = false
       this.distractionLevel = 0
-      if (shiftActive && eventBlocking) {
+      if (!paused && shiftActive && eventBlocking) {
         const sprintResolution = this.eventSystem.updateModal(deltaSeconds)
         if (sprintResolution) this.applyEventResolution(sprintResolution)
       }
-      this.followCamera.update(this.controller.state, this.controller.state.heading, deltaSeconds, 0, 0, 0, true)
+      if (!paused) this.followCamera.update(this.controller.state, this.controller.state.heading, deltaSeconds, 0, 0, 0, true)
     } else {
       this.distractionActive = false
       this.distractionLevel = 0
@@ -1048,7 +1097,7 @@ export class GameEngine {
     const weatherProgress = isChallenge
       ? this.shiftElapsed / SHIFT_DURATION_SECONDS
       : (this.shiftElapsed % SHIFT_DURATION_SECONDS) / SHIFT_DURATION_SECONDS
-    this.weather.update(deltaSeconds, this.started ? weatherProgress : 0, this.controller.state, this.interior.mode === 'none')
+    if (!paused) this.weather.update(deltaSeconds, this.started ? weatherProgress : 0, this.controller.state, this.interior.mode === 'none')
     this.weather.applyAtmosphere(
       this.scene,
       this.sunlight,
@@ -1069,9 +1118,9 @@ export class GameEngine {
     } else {
       if (!shiftActive || eventBlocking) this.updateRider()
       this.navigationVisuals.root.visible = this.started && this.view !== 'rider-rear' && this.view !== 'rider-side'
-      this.navigationVisuals.update(deltaSeconds, this.controller.state, this.navigation.snapshot, this.started && this.view === 'ride')
+      this.navigationVisuals.update(paused ? 0 : deltaSeconds, this.controller.state, this.navigation.snapshot, this.started && this.view === 'ride')
       this.navigationFrameListener?.(this.controller.state, this.navigation.snapshot)
-      this.world.updateCanopyOcclusion(this.followCamera.camera.position, this.started && this.view === 'ride' ? this.rider.root.position : null, deltaSeconds)
+      this.world.updateCanopyOcclusion(this.followCamera.camera.position, this.started && this.view === 'ride' ? this.rider.root.position : null, paused ? 0 : deltaSeconds)
       this.renderer.render(this.scene, this.view === 'ride' ? this.followCamera.camera : this.previewCamera)
     }
     this.sampleFrames += 1
@@ -1109,6 +1158,7 @@ export class GameEngine {
           remainingSec: isChallenge ? Math.max(0, SHIFT_DURATION_SECONDS - this.shiftElapsed) : SHIFT_DURATION_SECONDS,
           clockLabel: formatShiftClock(isChallenge ? this.shiftElapsed : this.shiftElapsed % SHIFT_DURATION_SECONDS),
           ended: this.shiftEnded,
+          paused: this.paused && this.started && !this.shiftEnded,
         },
         distraction: {
           phoneOpen: this.phoneOpen,

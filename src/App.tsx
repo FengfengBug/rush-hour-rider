@@ -4,6 +4,7 @@ import { ScaffoldStatus } from './components/ScaffoldStatus'
 import { RiderPhone } from './components/RiderPhone'
 import { EventModal } from './components/EventModal'
 import { DeliveryCameraOverlay } from './components/DeliveryCameraOverlay'
+import { PauseOverlay } from './components/PauseOverlay'
 import { StartOverlay } from './components/StartOverlay'
 import { ControlsHint } from './components/ControlsHint'
 import { SettlementModal } from './components/SettlementModal'
@@ -88,6 +89,18 @@ export default function App() {
     engine?.resumeShiftFromSettlement()
   }
 
+  function togglePause() {
+    engine?.togglePause()
+  }
+
+  function resumePause() {
+    engine?.setPaused(false)
+  }
+
+  function resetPauseView() {
+    engine?.resetView()
+  }
+
   const started = snapshot?.shift.started ?? false
   const shiftEnded = snapshot?.shift.ended ?? false
   const canResumeSettlement = !!snapshot && (
@@ -123,6 +136,7 @@ export default function App() {
         onResetRider={resetRider}
         onFinishShift={finishShiftEarly}
         onReturnToTitle={returnToTitle}
+        onTogglePause={togglePause}
       />
       {started && (
         <RiderPhone
@@ -136,6 +150,16 @@ export default function App() {
       <ControlsHint snapshot={snapshot} />
       {started && <EventModal engine={engine} snapshot={snapshot} />}
       {started && <DeliveryCameraOverlay engine={engine} snapshot={snapshot} />}
+      {started && (
+        <PauseOverlay
+          visible={snapshot?.shift.paused ?? false}
+          snapshot={snapshot}
+          onResume={resumePause}
+          onResetView={resetPauseView}
+          onFinishShift={finishShiftEarly}
+          onReturnToTitle={returnToTitle}
+        />
+      )}
       <SettlementModal
         key={`settlement-${snapshot?.orders.shiftId ?? 0}`}
         visible={started && shiftEnded}

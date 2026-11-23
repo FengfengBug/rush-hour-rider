@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bike, Compass, Play, Sparkles, Timer } from 'lucide-react'
+import { Bike, Compass, Play, Smartphone, Sparkles, Timer } from 'lucide-react'
 import type { GameMode } from '../game/types'
 import './StartOverlay.css'
 
@@ -20,6 +20,15 @@ const KEY_ITEMS = [
 
 export function StartOverlay({ visible, initialMode = 'challenge', onStart }: StartOverlayProps) {
   const [mode, setMode] = useState<GameMode>(initialMode)
+  const [compactExperience, setCompactExperience] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia('(pointer: coarse), (max-width: 760px)')
+    const sync = () => setCompactExperience(media.matches)
+    sync()
+    media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
 
   useEffect(() => {
     if (!visible) return
@@ -58,6 +67,16 @@ export function StartOverlay({ visible, initialMode = 'challenge', onStart }: St
         <p className="start-quote">
           在算法划定的每一秒里，穿过红灯、电梯、物业门禁与午后阵雨，看见城市运转背后真实的时间成本。
         </p>
+
+        {compactExperience && (
+          <div className="start-compact-hint" role="note">
+            <Smartphone size={16} aria-hidden="true" />
+            <div>
+              <strong>手机 / 平板体验提示</strong>
+              <p>核心骑行需要实体键盘（WASD / 空格 / Tab，Esc 暂停）。建议使用电脑体验；横屏可看到更完整的街区画面。</p>
+            </div>
+          </div>
+        )}
 
         <div className="start-modes" role="radiogroup" aria-label="选择游玩模式">
           <button
@@ -116,7 +135,7 @@ export function StartOverlay({ visible, initialMode = 'challenge', onStart }: St
             <span>上线接单</span>
             <kbd>Enter</kbd>
           </button>
-          <p className="start-tip">无需登录 · 鼠标悬停移动可自由环顾视角（左右 270°），滚轮缩放</p>
+          <p className="start-tip">无需登录 · 按 Esc 可随时暂停 · 鼠标悬停移动可自由环顾视角（左右 270°），滚轮缩放</p>
         </div>
       </section>
     </div>

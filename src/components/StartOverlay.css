@@ -97,6 +97,37 @@
   line-height: 1.55;
 }
 
+.start-compact-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: -4px 0 14px;
+  padding: 9px 11px;
+  border: 1px solid #e3cf9a;
+  border-radius: 11px;
+  color: #5c4a17;
+  background: rgba(255, 246, 216, 0.78);
+}
+
+.start-compact-hint svg {
+  flex: none;
+  margin-top: 1px;
+  color: #9a7416;
+}
+
+.start-compact-hint strong {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 850;
+}
+
+.start-compact-hint p {
+  margin: 2px 0 0;
+  color: #6a5a2b;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
 .start-modes {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -290,6 +321,117 @@
 
   .start-keys {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .start-compact-hint p {
+    font-size: 10px;
+  }
+}
+
+@media (max-height: 500px) {
+  .start-compact-hint p {
+    display: none;
+  }
+}
+
+/* 手机横屏 / 矮窗口：压缩开局卡片，保证「上线接单」按钮无需滚动即可见。 */
+@media (max-height: 520px) {
+  .start-overlay {
+    padding: 8px;
+  }
+
+  .start-card {
+    width: min(720px, calc(100vw - 20px));
+    max-height: calc(100vh - 16px);
+    padding: 12px 16px;
+    border-radius: 14px;
+  }
+
+  .start-top-badge {
+    padding: 2px 8px;
+    font-size: 10px;
+  }
+
+  .start-header {
+    gap: 9px;
+    margin-top: 6px;
+  }
+
+  .start-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+  }
+
+  .start-logo svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .start-title {
+    font-size: 20px;
+  }
+
+  .start-subtitle {
+    font-size: 9px;
+  }
+
+  .start-quote {
+    display: none;
+  }
+
+  .start-compact-hint {
+    margin: 8px 0 0;
+    padding: 6px 9px;
+  }
+
+  .start-compact-hint strong {
+    font-size: 10.5px;
+  }
+
+  .start-modes {
+    gap: 7px;
+    margin-top: 8px;
+  }
+
+  .start-mode-card {
+    gap: 3px;
+    padding: 8px 10px;
+    border-radius: 11px;
+  }
+
+  .start-mode-title {
+    font-size: 12px;
+  }
+
+  .start-mode-card p {
+    font-size: 10.5px;
+    line-height: 1.35;
+  }
+
+  .start-keys {
+    margin-top: 8px;
+    padding: 7px 9px;
+    gap: 4px;
+  }
+
+  .start-key-item {
+    font-size: 10.5px;
+  }
+
+  .start-footer {
+    margin-top: 9px;
+    gap: 4px;
+  }
+
+  .start-cta {
+    min-height: 40px;
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+
+  .start-tip {
+    display: none;
   }
 }
 

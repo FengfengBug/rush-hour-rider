@@ -348,6 +348,17 @@
   background: #fdf2cf;
 }
 
+.hud-bar .hud-action-btn--pause {
+  border-color: #cdd3c4;
+  color: #46564a;
+  background: #f1efe3;
+}
+
+.hud-bar .hud-action-btn--pause:hover:not(:disabled) {
+  border-color: #8fa190;
+  background: #e8edde;
+}
+
 .hud-bar .hud-action-btn--finish:hover:not(:disabled) {
   border-color: #bc8c22;
   background: #fde49b;

@@ -316,6 +316,7 @@ export interface ShiftSnapshot {
   remainingSec: number
   clockLabel: string
   ended: boolean
+  paused: boolean
 }
 
 export interface DistractionSnapshot {

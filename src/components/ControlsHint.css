@@ -130,12 +130,26 @@
   }
 }
 
+/* HUD 在 860px 以下折成两行，避让至其下方，避免遮挡班次指标。 */
+@media (min-width: 701px) and (max-width: 900px) {
+  .controls-hint {
+    top: 108px;
+  }
+}
+
 @media (max-width: 640px) {
   .controls-hint {
     right: 12px;
     left: 12px;
     width: auto;
     min-width: 0;
+  }
+}
+
+/* 手机窄屏 / 低高度横屏 / 触屏设备按键位引导无法落地，交给开局卡片的体验提示。 */
+@media (max-width: 700px), (max-height: 500px), (pointer: coarse) {
+  .controls-hint {
+    display: none;
   }
 }
 
