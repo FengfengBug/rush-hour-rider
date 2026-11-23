@@ -141,6 +141,7 @@
 .rider-phone-content { flex: 1; min-width: 0; min-height: 0; padding: 11px; overflow: auto; overscroll-behavior: contain; scroll-padding: 10px; scrollbar-width: thin; scrollbar-color: #b7bdac transparent; }
 .rider-phone .rider-phone-notice { margin-bottom: 10px; padding: 7px 9px; border: 1px solid #d9e1d0; border-radius: 8px; color: #466047; background: #edf1e5; font-size: 12px; line-height: 1.55; }
 .rider-phone .rider-phone-warning { margin-bottom: 9px; padding: 7px 9px; border: 1px solid #e5d6b3; border-radius: 7px; color: #7c571f; background: #fff2d4; font-size: 12px; line-height: 1.6; }
+.rider-phone .rider-phone-lobby-tip { margin: -3px 0 9px; padding: 6px 8px; border-left: 3px solid #d9b35c; border-radius: 0 6px 6px 0; color: #6b5a2d; background: #faf4e2; font-size: 11px; line-height: 1.5; }
 .rider-phone-section-heading { flex-wrap: wrap; justify-content: space-between; gap: 3px 8px; margin-bottom: 9px; }
 .rider-phone-section-heading h2 { font-size: 15px; font-weight: 800; line-height: 1.5; letter-spacing: -0.03em; }
 .rider-phone-section-heading > span { color: var(--phone-muted); font-size: 12px; }
@@ -150,6 +151,11 @@
 .rider-phone-offer-heading { flex-wrap: wrap; justify-content: space-between; gap: 4px 7px; margin-bottom: 10px; }
 .rider-phone-order-id { color: #6a6c60; font-size: 12px; }
 .rider-phone-on-the-way { display: inline-flex; align-items: center; gap: 3px; padding: 2px 5px; border: 1px solid #cbdcc5; border-radius: 5px; color: #2d6645; background: #eff5e9; font-size: 12px; font-weight: 600; cursor: help; }
+.rider-phone-access { display: inline-flex; align-items: center; gap: 5px; margin: 6px 0 0; padding: 3px 7px; border: 1px solid transparent; border-radius: 6px; font-size: 11px; font-weight: 750; line-height: 1.35; }
+.rider-phone-access small { font-size: 10px; font-weight: 650; opacity: 0.82; }
+.rider-phone-access[data-access="direct"] { border-color: #cbdcc5; color: #2d6645; background: #eff5e9; }
+.rider-phone-access[data-access="enter"] { border-color: #b7d7e5; color: #1d4e66; background: #e1f1f8; }
+.rider-phone-access[data-access="restricted"] { border-color: #e2b9b2; color: #8f352f; background: #f8e3de; }
 .rider-phone-route { display: grid; gap: 11px; }
 .rider-phone-route > div { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; min-width: 0; }
 .rider-phone-route > div:first-child::after { position: absolute; top: 24px; bottom: -8px; left: 10px; border-left: 1px dashed #d9dace; content: ""; }

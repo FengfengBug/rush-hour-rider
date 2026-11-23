@@ -1,10 +1,11 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { GameViewport } from './components/GameViewport'
 import { ScaffoldStatus } from './components/ScaffoldStatus'
 import { RiderPhone } from './components/RiderPhone'
 import { EventModal } from './components/EventModal'
 import { DeliveryCameraOverlay } from './components/DeliveryCameraOverlay'
+import { DeliveryDeltaToast } from './components/DeliveryDeltaToast'
 import { PauseOverlay } from './components/PauseOverlay'
 import { StartOverlay } from './components/StartOverlay'
 import { ControlsHint } from './components/ControlsHint'
@@ -28,6 +29,9 @@ export default function App() {
   const [engine, setEngine] = useState<GameEngine | null>(null)
   const [phoneOpen, setPhoneOpen] = useState(false)
   const [muted, setMuted] = useState<boolean>(readMutedPreference)
+  const phoneAutoOpened = useRef(false)
+  const [toastOrderId, setToastOrderId] = useState<string | null>(null)
+  const lastToastKey = useRef<string | null>(null)
   const [devPanelOpen, setDevPanelOpen] = useState<boolean>(() => {
     try {
       return new URLSearchParams(window.location.search).get('dev') === '1'
@@ -58,6 +62,15 @@ export default function App() {
       // Ignore storage unavailability in private browsing modes.
     }
   }, [engine, muted])
+
+  // 首局自动展开手机 3.2 秒，让评委不用先学 Tab 就能看到“抢单大厅”；之后不再打扰。
+  useEffect(() => {
+    if (!snapshot?.shift.started || phoneAutoOpened.current) return
+    phoneAutoOpened.current = true
+    setPhoneOpen(true)
+    const timer = window.setTimeout(() => setPhoneOpen(false), 3200)
+    return () => window.clearTimeout(timer)
+  }, [snapshot?.shift.started])
 
   function selectView(view: CityView) {
     engine?.setCityView(view)
@@ -121,6 +134,31 @@ export default function App() {
 
   const started = snapshot?.shift.started ?? false
   const shiftEnded = snapshot?.shift.ended ?? false
+  const completedOrders = snapshot?.orders.completed ?? []
+  const latestCompleted = completedOrders.length
+    ? [...completedOrders].sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))[0]
+    : null
+  const toastKey = latestCompleted && snapshot ? `${snapshot.orders.shiftId}:${latestCompleted.id}` : null
+
+  useEffect(() => {
+    if (!started || shiftEnded || !toastKey) {
+      setToastOrderId(null)
+      return
+    }
+    if (lastToastKey.current === toastKey) return
+    lastToastKey.current = toastKey
+    const latest = completedOrders.find((order) => `${snapshot?.orders.shiftId}:${order.id}` === toastKey)
+    if (!latest) return
+    setToastOrderId(latest.id)
+    const timer = window.setTimeout(() => setToastOrderId(null), 2400)
+    return () => window.clearTimeout(timer)
+    // completedOrders 每帧都是新数组，不能作为依赖；toastKey 已唯一标识“新完成一单”。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started, shiftEnded, toastKey])
+
+  const toastOrder = toastOrderId
+    ? completedOrders.find((order) => order.id === toastOrderId) ?? null
+    : null
   const canResumeSettlement = !!snapshot && (
     snapshot.shift.mode === 'free'
     || snapshot.shift.remainingSec > 0.05
@@ -170,6 +208,7 @@ export default function App() {
       <ControlsHint snapshot={snapshot} />
       {started && <EventModal engine={engine} snapshot={snapshot} />}
       {started && <DeliveryCameraOverlay engine={engine} snapshot={snapshot} />}
+      {started && !shiftEnded && <DeliveryDeltaToast order={toastOrder} />}
       {started && (
         <PauseOverlay
           visible={snapshot?.shift.paused ?? false}

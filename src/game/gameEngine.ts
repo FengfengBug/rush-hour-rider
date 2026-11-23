@@ -217,6 +217,10 @@ export class GameEngine {
     this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost)
     this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored)
     this.resize()
+    // 仅在 ?dev=1 时暴露引擎句柄，供本地自动化冒烟/数据核验使用；正常访问不注入任何全局对象。
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('dev')) {
+      ;(window as unknown as { __RHR_DEV__?: GameEngine }).__RHR_DEV__ = this
+    }
   }
 
   setCityView(view: CityView) {
@@ -505,7 +509,7 @@ export class GameEngine {
     let best: { landmark: CityLandmark; theme: InteriorTheme; dist: number } | null = null
     for (const entry of this.enterableLandmarks) {
       const dist = Math.hypot(state.x - entry.landmark.access.position.x, state.z - entry.landmark.access.position.z)
-      if (dist <= 6.2 && (!best || dist < best.dist)) {
+      if (dist <= 12 && (!best || dist < best.dist)) {
         best = { ...entry, dist }
       }
     }
@@ -734,6 +738,10 @@ export class GameEngine {
     this.renderer.dispose()
     this.renderer.forceContextLoss()
     this.renderer.domElement.remove()
+    if (typeof window !== 'undefined') {
+      const win = window as unknown as { __RHR_DEV__?: GameEngine }
+      if (win.__RHR_DEV__ === this) delete win.__RHR_DEV__
+    }
   }
 
   readonly focusCanvas = () => {

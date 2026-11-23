@@ -60,6 +60,9 @@ export interface CounterfactualResult {
   readonly totalSavedCents: number
   readonly baselineNetIncomeCents: number
   readonly projectedNetIncomeCents: number
+  readonly tightestOrderId: string | null
+  readonly tightestMarginSec: number
+  readonly projectedTightestMarginSec: number
   readonly headline: string
 }
 
@@ -275,6 +278,9 @@ export function evaluateCounterfactual(snapshot: EngineSnapshot, extraRealMinute
       totalSavedCents: savedFineCents,
       baselineNetIncomeCents,
       projectedNetIncomeCents: baselineNetIncomeCents + savedFineCents,
+      tightestOrderId: null,
+      tightestMarginSec: 0,
+      projectedTightestMarginSec: 0,
       headline,
     }
   }
@@ -282,11 +288,20 @@ export function evaluateCounterfactual(snapshot: EngineSnapshot, extraRealMinute
   let baselineOnTimeCount = 0
   let projectedOnTimeCount = 0
   let savedOrderCents = 0
+  let tightestOrderId: string | null = null
+  let tightestMarginSec = Number.POSITIVE_INFINITY
 
   for (const order of completed) {
     const s = order.settlement
     if (!s) continue
     if (s.onTime) baselineOnTimeCount += 1
+
+    // 距超时的真实缓冲：deadline 已包含事件追加的时限变化，completedAt 为实际完成时刻。
+    const marginSec = order.deadline - (order.completedAt ?? order.acceptedAt)
+    if (marginSec < tightestMarginSec) {
+      tightestMarginSec = marginSec
+      tightestOrderId = order.id
+    }
 
     const newLateSec = Math.max(0, s.lateSec - extraGameSec)
     const newOnTime = newLateSec <= 0.0000001
@@ -298,6 +313,9 @@ export function evaluateCounterfactual(snapshot: EngineSnapshot, extraRealMinute
       : Math.min(order.baseFeeCents, Math.ceil(newLateSec - 0.0000001) * 5)
     savedOrderCents += (s.penaltyCents - newPenaltyCents) + (newBonusCents - s.bonusCents)
   }
+
+  if (!tightestOrderId) tightestMarginSec = 0
+  const projectedTightestMarginSec = tightestMarginSec + extraGameSec
 
   const orderCount = completed.length
   const baselineOnTimeRate = Math.round((baselineOnTimeCount / orderCount) * 100)
@@ -348,6 +366,9 @@ export function evaluateCounterfactual(snapshot: EngineSnapshot, extraRealMinute
     totalSavedCents,
     baselineNetIncomeCents,
     projectedNetIncomeCents,
+    tightestOrderId,
+    tightestMarginSec,
+    projectedTightestMarginSec,
     headline,
   }
 }

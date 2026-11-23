@@ -77,8 +77,9 @@ export class OrderManager {
     this.notice = '开工了，选择一单开始配送。'
     const nearby = [...this.merchants].sort((a, b) => distance(a.access.position, this.spawn) - distance(b.access.position, this.spawn))
     const usedDestinations = new Set<string>()
-    // 开局三单涵盖三大特色送达体验：CBD 入楼拍照送达（星辰科技大厦）、高端封闭小区门禁（御景华府）、老旧开放小区直达（幸福里小区）。
-    const preferredDeliveries = ['starlight-tower', 'yujing-manor', 'xingfuli-estate']
+    // 开局三单按“先易后难”排序：R001 老小区可直达 → R002 高端小区门禁 → R003 CBD 进楼拍照。
+    // 首单不再是必须进楼的 CBD 单，评委第一次配送就能完成闭环。
+    const preferredDeliveries = ['xingfuli-estate', 'yujing-manor', 'starlight-tower']
     nearby.slice(0, 3).forEach((merchant, index) => {
       const preferredId = preferredDeliveries[index]
       const preferred = preferredId ? this.destinations.find((entry) => entry.id === preferredId && !usedDestinations.has(entry.id)) : undefined
@@ -122,6 +123,7 @@ export class OrderManager {
     if (this.active.length >= MAX_ACTIVE_ORDERS) return null
     const id = `R${String(++this.sequence).padStart(3, '0')}`
     const estimate = this.estimate(merchantId, deliveryId, rider)
+    const destination = this.landmarks.get(deliveryId)!
     this.active.push({
       id,
       merchantId,
@@ -129,6 +131,7 @@ export class OrderManager {
       offeredAt: this.elapsed,
       expiresAt: this.elapsed + OFFER_LIFETIME,
       ...estimate,
+      ...this.deliveryProfile(destination),
       baseFeeCents,
       status: 'pickup',
       acceptedAt: this.elapsed,
@@ -298,6 +301,13 @@ export class OrderManager {
         : null
       if (arrival !== null && this.isEnterableBuildingKind(deliveryKind)) {
         // CBD / 医院等人流集中建筑需下车进入一楼大堂放餐并拍照点送达，不在路边直接自动签收。
+        // 但到楼下时仍允许触发“大堂登记 / 电梯爆满 / 外卖柜已满 / 填错定位”等送达事件，避免这些内容永远不可达。
+        if (onArrivalIntercept?.({ phase: 'delivery', order, landmark: deliveryLandmark, buildingKind: deliveryKind })) {
+          intercepted = true
+          order.ledger[category] += deltaSeconds
+          order.actualSec += deltaSeconds
+          continue
+        }
         order.ledger[category] += deltaSeconds
         order.actualSec += deltaSeconds
         continue
@@ -480,8 +490,17 @@ export class OrderManager {
       merchantId: merchant.id, deliveryId: destination.id,
       offeredAt: at, expiresAt: at + OFFER_LIFETIME,
       ...this.estimate(merchant.id, destination.id, rider),
+      ...this.deliveryProfile(destination),
       baseFeeCents: 500 + Math.round(distance(merchant.access.position, destination.access.position) * 1.2),
     })
+  }
+
+  /** 抢单前就能看懂送达成本：直达 / 需进楼拍照 / 高端小区禁入电驴。 */
+  private deliveryProfile(destination: CityLandmark): Pick<OrderOffer, 'deliveryKind' | 'deliveryAccess' | 'deliveryExtraSec'> {
+    const kind = this.buildingKinds.get(destination.buildingId) ?? 'apartment'
+    if (kind === 'luxury') return { deliveryKind: kind, deliveryAccess: 'restricted', deliveryExtraSec: 15 }
+    if (this.isEnterableBuildingKind(kind)) return { deliveryKind: kind, deliveryAccess: 'enter', deliveryExtraSec: 25 }
+    return { deliveryKind: kind, deliveryAccess: 'direct', deliveryExtraSec: 0 }
   }
 
   private refreshOffer(rider: Point2, at: number): void {

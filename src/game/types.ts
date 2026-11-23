@@ -243,6 +243,8 @@ export interface OrderTimeLedger {
   idleSec: number
 }
 
+export type DeliveryAccess = 'direct' | 'enter' | 'restricted'
+
 export interface OrderOffer {
   id: string
   merchantId: string
@@ -252,6 +254,9 @@ export interface OrderOffer {
   idealDistance: number
   idealSec: number
   baseFeeCents: number
+  deliveryKind: BuildingKind
+  deliveryAccess: DeliveryAccess
+  deliveryExtraSec: number
 }
 
 export interface OrderSettlement {

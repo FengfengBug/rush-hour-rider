@@ -17,6 +17,9 @@ const MAX_ADDON_OFFERS = 2
 const INCOMING_CALL_SEC = 12.0
 const SPRINT_DURATION_SEC = 3.0
 const OUTCOME_TOAST_SEC = 3.8
+const FIRST_RUN_SCRIPT: readonly GameEventKind[] = ['merchant-backlog', 'wrong-pin-address', 'luxury-compound-no-ebike']
+// 仅本页第一局生效：首取餐必见卡餐，首送达必见填错定位，第二单送达必见高端小区门禁；再来一局回随机。
+let firstRunScriptPending = true
 
 export interface EventResolution {
   readonly orderId: string
@@ -277,6 +280,7 @@ export class EventSystem {
   private readonly seenKinds = new Set<GameEventKind>()
   private readonly handledStages = new Set<string>()
   private readonly calledOrderIds = new Set<string>()
+  private scriptedQueue: GameEventKind[] = []
 
   reset(): void {
     this.seed = 3107
@@ -304,6 +308,8 @@ export class EventSystem {
     this.seenKinds.clear()
     this.handledStages.clear()
     this.calledOrderIds.clear()
+    this.scriptedQueue = firstRunScriptPending ? [...FIRST_RUN_SCRIPT] : []
+    firstRunScriptPending = false
   }
 
   get hasActiveEvent(): boolean {
@@ -519,11 +525,27 @@ export class EventSystem {
   ): boolean {
     const stageKey = `${orderId}:${phase}`
     if (this.activeEvent || this.handledStages.has(stageKey)) return false
-    this.handledStages.add(stageKey)
-    if (this.cooldownSec > 0) return false
 
     const candidates = this.getCandidates(phase, buildingKind)
     if (candidates.length === 0) return false
+
+    // 首局轻脚本：按“卡餐 → 填错定位 → 高端小区门禁”的顺序优先消费当前可触发项；
+    // 脚本项绕过 24s 冷却，避免首取餐冷却把首送达机会吞掉。
+    const scriptedIndex = this.scriptedQueue.findIndex((kind) => candidates.includes(kind))
+    if (scriptedIndex >= 0) {
+      const chosen = this.scriptedQueue.splice(scriptedIndex, 1)[0]
+      this.handledStages.add(stageKey)
+      this.seenKinds.add(chosen)
+      this.triggeredCount += 1
+      const view = buildEventCard(++this.instanceSeq, chosen, phase, orderId, landmark)
+      this.incomingCall = null
+      this.activeEvent = { view, riderStaminaAtStart: riderStamina, sprint: null }
+      return true
+    }
+
+    // 冷却期不消耗本单本阶段的事件机会，冷却结束后仍可正常触发。
+    if (this.cooldownSec > 0) return false
+    this.handledStages.add(stageKey)
 
     const triggerChance = this.triggeredCount === 0
       ? (phase === 'delivery' ? 1 : 0.62)

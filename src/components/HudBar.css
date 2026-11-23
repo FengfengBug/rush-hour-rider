@@ -179,6 +179,36 @@
   transition: width 150ms linear;
 }
 
+.hud-ledger {
+  margin-top: 4px;
+}
+
+.hud-ledger-bar {
+  display: flex;
+  gap: 1px;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(105, 117, 94, 0.16);
+}
+
+.hud-ledger-bar > i {
+  display: block;
+  min-width: 2px;
+  height: 100%;
+}
+
+.hud-ledger-text {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #5f6b57;
+  font-size: 9.5px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .hud-metric--clock[data-urgent="true"] .hud-progress-track > span {
   background: #c5443a;
 }
@@ -585,6 +615,14 @@
 
   .hud-clock-time {
     font-size: 13px;
+  }
+
+  .hud-ledger-text {
+    display: none;
+  }
+
+  .hud-ledger-bar {
+    height: 2px;
   }
 
   .hud-value {

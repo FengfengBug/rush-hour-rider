@@ -13,7 +13,7 @@ import {
   VolumeX,
 } from 'lucide-react'
 import { MAX_ACTIVE_ORDERS } from '../game/orderManager'
-import type { EngineSnapshot, RideCameraMode } from '../game/types'
+import type { EngineSnapshot, OrderTimeLedger, RideCameraMode } from '../game/types'
 import './HudBar.css'
 
 interface HudBarProps {
@@ -32,6 +32,15 @@ const CAMERA_LABELS: Record<RideCameraMode, string> = {
   far: '远距',
   overhead: '俯视',
 }
+
+const LEDGER_BAR_SEGMENTS: { key: keyof OrderTimeLedger; label: string; color: string }[] = [
+  { key: 'ridingSec', label: '骑行', color: '#6f9c6b' },
+  { key: 'trafficWaitSec', label: '等红灯', color: '#d79a2b' },
+  { key: 'merchantDelaySec', label: '商家卡餐', color: '#c46a3a' },
+  { key: 'lastMileSec', label: '进楼/门禁', color: '#4f7ea8' },
+  { key: 'detourSec', label: '绕路/改址', color: '#8a6fa8' },
+  { key: 'idleSec', label: '停车/等待', color: '#96a092' },
+]
 
 function formatCountdown(seconds: number): string {
   const whole = Math.max(0, Math.ceil(seconds))
@@ -75,6 +84,27 @@ export function HudBar({
     : 0
   const clockUrgent = !isFreeMode && !!shift && !shift.ended && shift.remainingSec <= 30
 
+  const ledgerOrder = orders?.active.find((order) => order.id === orders.priorityId)
+    ?? orders?.active[0]
+    ?? [...completed].sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))[0]
+    ?? null
+  const ledgerSource = orders?.active.length ? '本单' : '刚送达'
+  const ledgerEntries = ledgerOrder
+    ? LEDGER_BAR_SEGMENTS.map(({ key, label, color }) => ({ key, label, color, value: ledgerOrder.ledger[key] }))
+    : []
+  const ledgerTotal = ledgerEntries.reduce((sum, entry) => sum + entry.value, 0)
+  const ledgerLosses = ledgerEntries
+    .filter((entry) => entry.key !== 'ridingSec' && entry.value > 0.05)
+    .sort((a, b) => b.value - a.value)
+  const ledgerSummary = ledgerTotal > 0.05
+    ? `${ledgerSource} · ${ledgerLosses.length > 0
+      ? ledgerLosses.slice(0, 2).map((entry) => `${entry.label} ${entry.value.toFixed(0)}s`).join(' · ')
+      : `全程骑行 ${ledgerTotal.toFixed(0)}s`}`
+    : '接单后开始记录时间去向'
+  const ledgerTitle = ledgerTotal > 0.05
+    ? `${ledgerSource}时间去向：${ledgerEntries.filter((entry) => entry.value > 0.05).map((entry) => `${entry.label} ${entry.value.toFixed(1)}s`).join(' · ')}`
+    : '接单后开始记录时间去向'
+
   return (
     <div className="hud-top-stack">
       <header className="hud-bar" aria-label="午高峰顶部状态栏">
@@ -116,6 +146,16 @@ export function HudBar({
             </div>
             <div className="hud-progress-track" aria-hidden="true">
               <span style={{ width: isFreeMode ? '100%' : `${shiftProgress}%` }} />
+            </div>
+            <div className="hud-ledger" title={ledgerTitle}>
+              <div className="hud-ledger-bar" aria-hidden="true">
+                {ledgerTotal > 0.05 && ledgerEntries.map(({ key, color, value }) => (
+                  value > 0.05
+                    ? <i key={key} style={{ width: `${(value / ledgerTotal) * 100}%`, backgroundColor: color }} />
+                    : null
+                ))}
+              </div>
+              <span className="hud-ledger-text">{ledgerSummary}</span>
             </div>
           </div>
 

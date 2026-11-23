@@ -18,6 +18,7 @@ import {
   SIM_SECONDS_PER_REAL_MINUTE,
 } from '../game/counterfactual'
 import type { EngineSnapshot, OrderTimeLedger } from '../game/types'
+import { CITY_LAYOUT } from '../game/cityLayout'
 import { downloadSharePosterPng } from './sharePoster'
 import './SettlementModal.css'
 
@@ -40,6 +41,7 @@ const LEDGER_SEGMENTS: { key: keyof OrderTimeLedger; label: string; color: strin
 ]
 
 const PRESET_MINUTES = [0, 3, 5, 8] as const
+const LANDMARK_NAMES = new Map(CITY_LAYOUT.landmarks.map(({ id, name }) => [id, name]))
 
 function fmtMoney(cents: number): string {
   return `¥${(cents / 100).toFixed(2)}`
@@ -175,7 +177,7 @@ export function SettlementModal({
 
               <div className="ledger-row">
                 <div className="ledger-row-label">
-                  <strong>现实实际耗时</strong>
+                  <strong>累计每单配送时长</strong>
                   <span data-over={overflowSec > 0.1}>
                     {fmtSec(summary.actualTotalSec)}
                     {overflowSec > 0.1 ? `（超出 +${fmtSec(overflowSec)}）` : ''}
@@ -214,6 +216,48 @@ export function SettlementModal({
                   )
                 })}
               </div>
+
+              <p className="ledger-note">
+                本局 210 秒模拟现实午高峰 120 分钟；每单从接单起独立计时，多单并行时同一秒会同时记入多单，因此「逐单相加」会大于班次总时长。
+              </p>
+
+              {summary.completedCount > 0 && (
+                <details className="ledger-orders">
+                  <summary>逐单明细 · {summary.completedCount} 单</summary>
+                  <ul>
+                    {snapshot.orders.completed.map((order) => {
+                      const top = LEDGER_SEGMENTS
+                        .filter(({ key }) => key !== 'ridingSec')
+                        .map(({ key, label }) => ({ label, value: order.ledger[key] }))
+                        .sort((a, b) => b.value - a.value)[0]
+                      const settlement = order.settlement
+                      const onTime = settlement?.onTime ?? false
+                      const lateSec = settlement?.lateSec ?? 0
+                      const marginSec = order.deadline - (order.completedAt ?? order.acceptedAt)
+                      return (
+                        <li key={order.id}>
+                          <div className="ledger-order-head">
+                            <strong>{order.id}</strong>
+                            <span>{LANDMARK_NAMES.get(order.deliveryId) ?? order.deliveryId}</span>
+                          </div>
+                          <div className="ledger-order-metrics">
+                            <span>平台 {order.idealSec}s</span>
+                            <span data-late={!onTime}>现实 {order.actualSec.toFixed(1)}s</span>
+                            <span data-late={!onTime}>
+                              {onTime ? `准时 · 余 ${Math.max(0, marginSec).toFixed(1)}s` : `超时 ${lateSec.toFixed(1)}s`}
+                            </span>
+                          </div>
+                          <small>
+                            {top && top.value > 0.05
+                              ? `最大耗时：${top.label} ${top.value.toFixed(1)}s`
+                              : '全程骑行，无额外时间损耗'}
+                          </small>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </details>
+              )}
             </div>
           )}
         </section>
@@ -314,6 +358,22 @@ export function SettlementModal({
           </div>
 
           <p className="cf-headline">{cf.headline}</p>
+          {cf.tightestOrderId && (
+            <p className="cf-tightest">
+              最脆弱的一单 <strong>{cf.tightestOrderId}</strong>：
+              {cf.tightestMarginSec >= 0
+                ? `距超时只剩 ${fmtSec(cf.tightestMarginSec)} 缓冲`
+                : `已超时 ${fmtSec(Math.abs(cf.tightestMarginSec))}`}
+              {extraMinutes > 0
+                ? `；每单多给 ${extraMinutes} 分钟 → ${
+                  cf.projectedTightestMarginSec >= 0
+                    ? `缓冲变为 ${fmtSec(cf.projectedTightestMarginSec)}`
+                    : `仍超时 ${fmtSec(Math.abs(cf.projectedTightestMarginSec))}`
+                }`
+                : '；拖动滑块看看它能多出多少缓冲'}
+              。
+            </p>
+          )}
           <p className="cf-footnote">
             数据口径：以上全部指标均基于你本局真实订单账本与违章记录动态重算（非预设数据）；按本局 3.5 分钟模拟午高峰刻度，现实每 +1 分钟缓冲 = 局内每单 +{SIM_SECONDS_PER_REAL_MINUTE} 秒。
           </p>

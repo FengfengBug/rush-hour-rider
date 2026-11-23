@@ -3,7 +3,7 @@ import { Camera, ChevronDown, ChevronUp, Inbox, MessageSquare, Navigation, Signa
 import { CITY_LAYOUT } from '../game/cityLayout'
 import type { GameEngine } from '../game/gameEngine'
 import { MAX_ACTIVE_ORDERS } from '../game/orderManager'
-import type { DeliveryOrder, EngineSnapshot, OrderMessage, OrderOffer, OrderReportReason } from '../game/types'
+import type { BuildingKind, DeliveryAccess, DeliveryOrder, EngineSnapshot, OrderMessage, OrderOffer, OrderReportReason } from '../game/types'
 import { CompletedBill, OrderRules } from './OrderPanel'
 import './RiderPhone.css'
 
@@ -42,6 +42,21 @@ function elapsedTime(seconds: number) {
 function countdown(seconds: number) {
   const late = seconds < -0.0000001
   return `${late ? '超时' : '剩余'} ${elapsedTime(Math.ceil(late ? -seconds - 0.0000001 : Math.max(0, seconds)))}`
+}
+
+function deliveryAccessLabel(access: DeliveryAccess, kind: BuildingKind): string {
+  if (access === 'restricted') return '禁入电驴 · 门禁步行'
+  if (access === 'enter') return kind === 'hospital' ? '需进门诊大厅 · 拍照送达' : '需进大堂 · 拍照送达'
+  return '可直达楼下'
+}
+
+function DeliveryAccessBadge({ access, kind, extraSec }: { access: DeliveryAccess; kind: BuildingKind; extraSec: number }) {
+  return (
+    <span className="rider-phone-access" data-access={access}>
+      {deliveryAccessLabel(access, kind)}
+      {access !== 'direct' && <small>约 +{extraSec}s</small>}
+    </span>
+  )
 }
 
 function RouteStops({ order, stage }: { order: Pick<OrderOffer, 'merchantId' | 'deliveryId'>; stage?: 'pickup' | 'delivery' }) {
@@ -257,6 +272,7 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
             {tab === 'lobby' && (
               <section aria-label="待抢订单">
                 <div className="rider-phone-section-heading"><h2>附近好单</h2><span>持有 <b>{held}/{MAX_ACTIVE_ORDERS}</b></span></div>
+                {held === 0 && <p className="rider-phone-lobby-tip">建议先接 1 单熟悉路线；3 单并跑更容易超时。</p>}
                 {full && <p className="rider-phone-warning">配送已满 {MAX_ACTIVE_ORDERS} 单，完成一单后可继续接单。</p>}
                 <ul className="rider-phone-card-list">
                   {offers.map((offer) => {
@@ -269,6 +285,7 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
                           {offer.onTheWay && <span className="rider-phone-on-the-way" title="根据当前位置与在途订单地点的直线几何关系估算，未计算路网、红灯或卡餐，不保证实际顺路或更快。"><Navigation size={12} aria-hidden="true" />顺路·直线估算</span>}
                         </div>
                         <RouteStops order={offer} />
+                        <DeliveryAccessBadge access={offer.deliveryAccess} kind={offer.deliveryKind} extraSec={offer.deliveryExtraSec} />
                         <div className="rider-phone-offer-fee"><span>基础配送费</span><strong>{money(offer.baseFeeCents)}</strong></div>
                         <dl className="rider-phone-offer-metrics">
                           <div><dt>平台理想限时</dt><dd>{offer.idealSec} <span>秒</span></dd></div>
@@ -298,6 +315,7 @@ export function RiderPhone({ engine, snapshot, open, onOpenChange }: RiderPhoneP
                       <li className="rider-phone-card rider-phone-delivery-card" key={order.id} data-priority={priority} data-critical={remaining < 30}>
                         <div className="rider-phone-delivery-heading"><span className="rider-phone-stage" data-stage={order.status}>{order.status === 'pickup' ? '待取餐' : '待送达'}</span><span className="rider-phone-order-id">{order.id}</span>{priority && <span className="rider-phone-priority-label">当前导航</span>}</div>
                         <RouteStops order={order} stage={order.status === 'pickup' ? 'pickup' : 'delivery'} />
+                        <DeliveryAccessBadge access={order.deliveryAccess} kind={order.deliveryKind} extraSec={order.deliveryExtraSec} />
                         <div className="rider-phone-countdown"><strong>{countdown(remaining)}</strong><span>限时 {order.idealSec} 秒</span></div>
                         <div className="rider-phone-progress" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, remaining / Math.max(1, order.deadline - order.acceptedAt) * 100))}%` }} /></div>
                         <p className="rider-phone-delivery-meta">已用 {order.actualSec.toFixed(1)} 秒 · 基础费 {money(order.baseFeeCents)}</p>

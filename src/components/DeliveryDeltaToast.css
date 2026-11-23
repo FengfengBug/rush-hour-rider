@@ -1,0 +1,126 @@
+.delivery-delta {
+  position: absolute;
+  bottom: 96px;
+  left: 50%;
+  z-index: 38;
+  width: min(440px, calc(100vw - 32px));
+  padding: 9px 12px 10px;
+  border: 1px solid #e0dfcd;
+  border-left: 4px solid #d79a2b;
+  border-radius: 12px;
+  color: #33402f;
+  background: rgba(253, 250, 240, 0.96);
+  box-shadow: 0 14px 34px rgba(24, 34, 25, 0.22);
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: delivery-delta-in 220ms cubic-bezier(0.18, 0.88, 0.3, 1.04);
+}
+
+.delivery-delta-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.delivery-delta-badge {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 5px;
+  color: #2d6645;
+  background: #e4f0e2;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.delivery-delta-badge[data-late="true"] {
+  color: #97372f;
+  background: #f7ded8;
+}
+
+.delivery-delta-head strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-delta-money {
+  margin-left: auto;
+  color: #8b5418;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.delivery-delta-times {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  margin-top: 4px;
+  color: #626e59;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.delivery-delta-times b {
+  color: #33402f;
+  font-size: 12px;
+}
+
+.delivery-delta-times em {
+  margin-left: auto;
+  color: #2d6645;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.delivery-delta-times em[data-late="true"] {
+  color: #b34a3d;
+}
+
+.delivery-delta-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  margin-top: 3px;
+  color: #6b7663;
+  font-size: 10px;
+}
+
+.delivery-delta-segments > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.delivery-delta-segments i {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+}
+
+.delivery-delta-late {
+  color: #b34a3d;
+  font-weight: 700;
+}
+
+@keyframes delivery-delta-in {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (max-width: 760px) {
+  .delivery-delta {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .delivery-delta {
+    animation: none;
+  }
+}

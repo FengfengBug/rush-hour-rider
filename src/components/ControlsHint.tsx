@@ -20,6 +20,7 @@ export function ControlsHint({ snapshot }: ControlsHintProps) {
   const completedFirst = orders.completed.length > 0
   const pickedUp = completedFirst || orders.active.some((o) => o.status === 'delivery')
   const accepted = pickedUp || orders.active.length > 0
+  const phoneOpen = snapshot.distraction.phoneOpen
 
   // 完成首单后自动隐藏（保留 3 秒成就感），或超过 40 秒且已进入配送循环后自动收起
   if (completedFirst && orders.completed[0]?.completedAt !== null && orders.elapsedSec - (orders.completed[0]?.completedAt ?? 0) > 3.5) {
@@ -34,7 +35,9 @@ export function ControlsHint({ snapshot }: ControlsHintProps) {
       ? '跟随绿色光柱与路面箭头送达顾客（CBD/医院门口按 E 进大堂拍照）'
       : accepted
         ? '已接单！跟随橙色光柱骑往商家取餐，WASD 控制方向、Shift 加速'
-        : '按 Tab 展开右下角骑手手机，在「抢单大厅」抢下你的第一单'
+        : phoneOpen
+          ? '点击手机里的「一键抢单」接下第一单；建议先跑 1 单熟悉路线'
+          : '按 Tab 展开右下角骑手手机，在「抢单大厅」抢下你的第一单'
 
   const steps = [
     { label: '按 Tab 抢第一单', done: accepted, current: stepIndex === 0 },
