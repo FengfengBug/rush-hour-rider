@@ -43,6 +43,7 @@ export class FollowCamera {
   private targetOrbitYaw = 0
   private targetOrbitPitch = 0
   private zoomScale = 1
+  private baseFov = 52
   private initialized = false
 
   constructor(buildings: readonly CityBuilding[]) {
@@ -88,6 +89,10 @@ export class FollowCamera {
 
   /** 开局主界面实时缓动环绕镜头，展示鲜活的 8×8 微缩中国街区与动态车流 */
   updateTitleOrbit(center: Point2, elapsedSeconds: number): void {
+    if (Math.abs(this.camera.fov - this.baseFov) > 0.01) {
+      this.camera.fov = this.baseFov
+      this.camera.updateProjectionMatrix()
+    }
     const angle = 0.55 + elapsedSeconds * 0.11
     const radius = 54 + Math.sin(elapsedSeconds * 0.24) * 6
     const height = 27 + Math.sin(elapsedSeconds * 0.31) * 3.5
@@ -104,6 +109,8 @@ export class FollowCamera {
     this.heading = wrapAngle(heading)
     this.resetOrbit()
     this.prepareGoals(position)
+    this.camera.fov = this.baseFov
+    this.camera.updateProjectionMatrix()
     this.camera.position.copy(this.goal)
     this.lookTarget.copy(this.lookGoal)
     this.positionVelocity.set(0, 0, 0)
@@ -117,7 +124,7 @@ export class FollowCamera {
     position: Point2,
     heading: number,
     deltaSeconds: number,
-    _speed = 0,
+    speed = 0,
     distraction = 0,
     distractionTime = 0,
     reducedMotion = false,
@@ -142,6 +149,13 @@ export class FollowCamera {
     if (this.shortenSegment(this.camera.position)) this.positionVelocity.set(0, 0, 0)
     if (this.shortenSegment(this.lookTarget)) this.lookVelocity.set(0, 0, 0)
     this.lookAtPoint.copy(this.lookTarget)
+    // 极轻微的速度 FOV：最高 +2.6°，增强冲刺感但不做剧烈镜头晃动。
+    const speedFov = reducedMotion ? 0 : Math.min(1, Math.max(0, speed) / 16.2) * 2.6
+    const targetFov = this.baseFov + speedFov
+    if (Math.abs(targetFov - this.camera.fov) > 0.01) {
+      this.camera.fov += (targetFov - this.camera.fov) * (1 - Math.exp(-4 * dt))
+      this.camera.updateProjectionMatrix()
+    }
     if (distraction > 0.01 && !reducedMotion) {
       const sway = Math.sin(distractionTime * 2.1) * 0.16 * distraction
       const bob = Math.cos(distractionTime * 3.4) * 0.045 * distraction
@@ -165,7 +179,8 @@ export class FollowCamera {
     const w = width
     const h = height
     const portrait = Math.max(0, Math.min(1, (1.1 - w / h) / 0.6))
-    this.camera.fov = 52 + portrait * 16
+    this.baseFov = 52 + portrait * 16
+    this.camera.fov = this.baseFov
     this.camera.setViewOffset(w, h, 0, -h * portrait * 0.095, w, h)
   }
 

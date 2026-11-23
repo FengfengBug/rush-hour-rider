@@ -59,9 +59,27 @@ export function buildRiderVehicle() {
   const helmetGeometry = geometry(new SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.58))
   const jacketGeometry = geometry(new CylinderGeometry(0.28, 0.22, 1, 8))
   const materials = new Set<Material>()
+  const extraTextures = new Set<CanvasTexture>()
   function material(color: string, metalness = 0) {
     const value = new MeshStandardMaterial({ color, roughness: 0.72, metalness, flatShading: true })
     materials.add(value)
+    return value
+  }
+  function softLightTexture() {
+    const canvas = document.createElement('canvas')
+    canvas.width = 128
+    canvas.height = 128
+    const context = canvas.getContext('2d')!
+    const gradient = context.createRadialGradient(64, 64, 4, 64, 64, 62)
+    gradient.addColorStop(0, 'rgba(255, 246, 214, 0.95)')
+    gradient.addColorStop(0.38, 'rgba(255, 232, 166, 0.45)')
+    gradient.addColorStop(0.72, 'rgba(255, 214, 128, 0.1)')
+    gradient.addColorStop(1, 'rgba(255, 214, 128, 0)')
+    context.fillStyle = gradient
+    context.fillRect(0, 0, 128, 128)
+    const value = new CanvasTexture(canvas)
+    value.colorSpace = SRGBColorSpace
+    extraTextures.add(value)
     return value
   }
   const yellow = material('#f8bd27')
@@ -160,9 +178,9 @@ export function buildRiderVehicle() {
   box(steering, rubber, [0, 0.92, 0.24], [0.31, 0.17, 0.17])
   const headlightLens = box(steering, headlight, [0, 0.92, 0.331], [0.25, 0.115, 0.025])
   headlightLens.name = 'headlight-lens'
-  const beamGeometry = geometry(new ConeGeometry(1.45, 7.6, 12, 1, true))
+  const beamGeometry = geometry(new ConeGeometry(1.05, 6.8, 14, 1, true))
   const beamMaterial = new MeshBasicMaterial({
-    color: '#fff1b8',
+    color: '#ffdf9c',
     transparent: true,
     opacity: 0,
     depthWrite: false,
@@ -171,15 +189,16 @@ export function buildRiderVehicle() {
   materials.add(beamMaterial)
   const headlightBeam = new Mesh(beamGeometry, beamMaterial)
   headlightBeam.name = 'headlight-beam'
-  headlightBeam.position.set(0, 0.62, 4.1)
+  headlightBeam.position.set(0, 0.6, 3.75)
   headlightBeam.rotation.set(-Math.PI / 2 + 0.08, 0, 0)
   headlightBeam.visible = false
   steering.add(headlightBeam)
 
-  const roadPoolGeometry = geometry(new CircleGeometry(1.85, 14))
+  const roadPoolGeometry = geometry(new CircleGeometry(1.65, 18))
   roadPoolGeometry.rotateX(-Math.PI / 2)
   const roadPoolMaterial = new MeshBasicMaterial({
-    color: '#ffe9a6',
+    map: softLightTexture(),
+    color: '#ffe3a3',
     transparent: true,
     opacity: 0,
     depthWrite: false,
@@ -188,8 +207,8 @@ export function buildRiderVehicle() {
   materials.add(roadPoolMaterial)
   const headlightPool = new Mesh(roadPoolGeometry, roadPoolMaterial)
   headlightPool.name = 'headlight-pool'
-  headlightPool.position.set(0, 0.08, 5.2)
-  headlightPool.scale.set(1.0, 1.0, 1.85)
+  headlightPool.position.set(0, 0.08, 4.6)
+  headlightPool.scale.set(0.95, 1.0, 1.55)
   headlightPool.visible = false
   steering.add(headlightPool)
   box(lean, rubber, [0, 0.83, -1.33], [0.38, 0.15, 0.06])
@@ -326,11 +345,12 @@ export function buildRiderVehicle() {
       const beamStrength = Math.max(0, Math.min(1, headlightIntensity))
       headlight.emissiveIntensity = 0.7 + beamStrength * 2.4
       const beamOn = beamStrength > 0.03
-      headlightBeam.visible = beamOn
+      // 3D 光锥在雨天叠加混合会形成大片白斑；改用柔和地面光斑 + 灯罩自发光表达车灯。
+      headlightBeam.visible = false
       headlightPool.visible = beamOn
       if (beamOn) {
-        beamMaterial.opacity = beamStrength * 0.22
-        roadPoolMaterial.opacity = beamStrength * 0.28
+        beamMaterial.opacity = 0
+        roadPoolMaterial.opacity = beamStrength * 0.13
       }
       taillight.color.set(braking ? '#ff5548' : '#ac3435')
       taillight.emissiveIntensity = braking ? 2.8 : 0.18
@@ -354,6 +374,7 @@ export function buildRiderVehicle() {
     dispose() {
       geometries.forEach((entry) => entry.dispose())
       materials.forEach((entry) => entry.dispose())
+      extraTextures.forEach((entry) => entry.dispose())
       texture.dispose()
       root.clear()
       root.removeFromParent()
